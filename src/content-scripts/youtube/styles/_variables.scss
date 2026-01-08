@@ -1,0 +1,80 @@
+// YT-Enhancer Global SCSS Variables
+// ===================================
+/*
+// Color Palette (matching YouTube dark theme)
+$yt-bg-primary: #0f0f0f;
+$yt-bg-secondary: #272727;
+$yt-bg-hover: #3f3f3f;
+$yt-bg-active: #525252;
+
+$yt-text-primary: #f1f1f1;
+$yt-text-secondary: #aaaaaa;
+$yt-text-muted: #717171;
+
+$yt-accent: #ff0000;
+$yt-accent-hover: #cc0000;
+
+$yt-border: #3f3f3f;
+$yt-divider: #333333;
+
+// Addon-specific colors
+$addon-primary: #3ea6ff;
+$addon-primary-hover: #65b8ff;
+$addon-success: #2ba640;
+$addon-warning: #f9a825;
+$addon-error: #ff4e45;
+
+// Typography
+$font-family: "Roboto", "Arial", sans-serif;
+$font-size-sm: 12px;
+$font-size-md: 14px;
+$font-size-lg: 16px;
+
+// Spacing
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 24px;
+
+// Border Radius
+$radius-sm: 4px;
+$radius-md: 8px;
+$radius-lg: 12px;
+$radius-full: 9999px;
+
+// Shadows
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+$shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+$shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+// Transitions
+$transition-fast: 150ms ease;
+$transition-normal: 250ms ease;
+$transition-slow: 350ms ease;
+
+// Z-index layers
+$z-dropdown: 2000;
+$z-overlay: 2100;
+$z-tooltip: 2200;
+
+// Breakpoints (if needed)
+$breakpoint-sm: 600px;
+$breakpoint-md: 1024px;
+$breakpoint-lg: 1440px; */
+
+// YouTube Variables
+$bg-black: #000000 !important;
+$bg-semi-black-1: rgba(0, 0, 0, 0.6) !important;
+$bg-semi-black-2: rgba(0, 0, 0, 0.8) !important;
+$bg-semi-white-1: rgba(255, 255, 255, 0.1) !important;
+$bg-transparent: transparent !important;
+$display-hidden: none !important;
+$primary-color: #ff0000 !important;
+$youtube-dark-bg: #0f0f0f !important;
+$text-color: #ffffff !important;
+
+$filter-blur-6: blur(6px) !important;
+$filter-blur-8: blur(8px) !important;
+
+$border-1: 1px solid #343434 !important;

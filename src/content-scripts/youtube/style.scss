@@ -1,0 +1,94 @@
+// YouTube Content Script Styles
+// ==============================
+
+@use "styles/variables" as *;
+
+// YouTube Styles
+body {
+  ytd-app {
+    background: $bg-black;
+
+    #frosted-glass.with-chipbar.ytd-app,
+    #frosted-glass.loading-with-chipbar.ytd-app {
+      display: $display-hidden;
+    }
+
+    .ytSearchboxComponentInputBoxDark {
+      background: $bg-transparent;
+
+      .ytSearchboxComponentSearchForm {
+        .ytSearchboxComponentInnerSearchIcon {
+          display: $display-hidden;
+        }
+      }
+    }
+
+    .ytSearchboxComponentInputBoxHasFocus {
+      padding: 2px 4px 2px 16px !important;
+    }
+
+    .ytSearchboxComponentSuggestionsContainer {
+      background: $bg-semi-black-1 !important;
+      backdrop-filter: $filter-blur-6;
+      border: $border-1;
+    }
+
+    ytd-masthead#masthead {
+      #background.ytd-masthead {
+        background: $bg-semi-black-2;
+        backdrop-filter: $filter-blur-8;
+        display: unset !important;
+        border-bottom: $border-1;
+      }
+    }
+
+    #chips-wrapper.ytd-feed-filter-chip-bar-renderer {
+      background: $bg-semi-black-2;
+      backdrop-filter: $filter-blur-8;
+    }
+
+    div#above-the-fold.ytd-watch-metadata {
+      div#title.ytd-watch-metadata {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+
+        h1.ytd-watch-metadata {
+          font-size: 2.4rem !important;
+          line-height: 4rem !important;
+          font-weight: 600 !important;
+          padding: 1rem !important;
+          background: $bg-semi-white-1;
+          border-radius: 14px !important;
+        }
+      }
+
+      div#top-row.ytd-watch-metadata {
+        #owner.ytd-watch-metadata {
+          margin: 2rem 0 0 1rem !important;
+        }
+      }
+    }
+
+    div#contentWrapper {
+      ytd-multi-page-menu-renderer {
+        background: $bg-semi-black-2;
+        border: $border-1;
+      }
+    }
+
+    div#contentContainer {
+      background: $bg-semi-black-2;
+      backdrop-filter: $filter-blur-8;
+      border-right: $border-1;
+
+      #guide-content.ytd-app {
+        background: $bg-transparent;
+      }
+    }
+
+    .ytp-delhi-modern .ytp-time-wrapper:not(.ytp-miniplayer-ui *) {
+      backdrop-filter: blur(8px) !important;
+    }
+  }
+}

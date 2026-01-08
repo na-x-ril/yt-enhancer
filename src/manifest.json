@@ -1,0 +1,35 @@
+{
+  "manifest_version": 2,
+  "name": "YT-Enhancer",
+  "version": "1.0.0",
+  "description": "Enhance your YouTube experience with useful features",
+  "icons": {
+    "48": "public/icons/icon-48.svg",
+    "96": "public/icons/icon-96.svg"
+  },
+  "permissions": ["storage", "tabs"],
+  "background": {
+    "scripts": ["background/index.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["youtube/injected-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["youtube/index.js"],
+      "css": ["youtube/style.css"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "yt-enhancer@example.com",
+      "strict_min_version": "91.0"
+    }
+  }
+}

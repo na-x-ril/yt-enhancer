@@ -1,0 +1,22 @@
+{
+  "name": "yt-enhancer-2",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "esbuild": "^0.27.2",
+    "sass": "^1.97.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@types/webextension-polyfill": "^0.12.4",
+    "webextension-polyfill": "^0.12.0"
+  }
+}
