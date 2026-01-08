@@ -1,4 +1,4 @@
-// src/content-scripts/youtube/features/watch/index.ts (update bagian quality service)
+// src/content-scripts/youtube/features/watch/index.ts
 import type {
   YouTubePlayer,
   InitialData,
@@ -24,14 +24,308 @@ export const watchFeature = (() => {
   let qualityChangeListener: ((q: string) => void) | null = null;
   let isCaptionActive = false;
 
+  // Animation state
+  let currentViewCount = 0;
+  let animationFrameId: number | null = null;
+
+  // ===== Utility Functions =====
   const fetchData = async (url: string) => {
     const res = await fetch(url);
     return res.text();
   };
 
+  const delay = (ms: number) => {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  };
+
   const getVideoId = () =>
     new URLSearchParams(new URL(location.href).search).get("v");
 
+  const waitForElement = async (
+    selector: string,
+    timeout: number = 5000,
+  ): Promise<Element | null> => {
+    const element = document.querySelector(selector);
+    if (element) return element;
+
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const observer = new MutationObserver(() => {
+        const element = document.querySelector(selector);
+        if (element || Date.now() - startTime > timeout) {
+          observer.disconnect();
+          resolve(element);
+        }
+      });
+
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(null);
+      }, timeout);
+    });
+  };
+
+  // ===== Animation Functions =====
+  const lerp = (start: number, end: number, t: number): number => {
+    return start + (end - start) * t;
+  };
+
+  const easeOutExpo = (t: number): number => {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  };
+
+  const parseViewCountData = (
+    viewCountStr: string,
+  ): { count: number; formatted: string; useComma: boolean } => {
+    if (!viewCountStr) return { count: 0, formatted: "0", useComma: false };
+
+    const formatted = viewCountStr;
+    const lowerStr = viewCountStr.toLowerCase();
+
+    // Deteksi apakah menggunakan koma sebagai thousand separator
+    const useComma =
+      viewCountStr.includes(",") && !viewCountStr.match(/\d+\.\d+[KMB]/i);
+
+    // Untuk parsing, ganti koma dengan titik jika ada, lalu hapus semua non-digit kecuali titik
+    const normalized = viewCountStr.replace(/,/g, useComma ? "" : ".");
+    const cleaned = normalized.replace(/[^\d.]/g, "");
+
+    let multiplier = 1;
+    if (lowerStr.includes("k")) multiplier = 1000;
+    else if (lowerStr.includes("m") || lowerStr.includes("jt"))
+      multiplier = 1000000;
+    else if (lowerStr.includes("b") || lowerStr.includes("miliar"))
+      multiplier = 1000000000;
+
+    const num = parseFloat(cleaned);
+    return {
+      count: isNaN(num) ? 0 : Math.floor(num * multiplier),
+      formatted: formatted,
+      useComma: useComma,
+    };
+  };
+
+  const formatViewCount = (
+    currentNum: number,
+    originalFormat: string,
+    useComma: boolean,
+  ): string => {
+    const suffixMatch = originalFormat.match(/[\d.,\s]+(.*)/);
+    const suffix = suffixMatch ? suffixMatch[1]?.trim() : "";
+    const lowerOriginal = originalFormat.toLowerCase();
+
+    if (lowerOriginal.includes("k")) {
+      const value = (currentNum / 1000).toFixed(1);
+      const formattedValue = useComma ? value.replace(".", ",") : value;
+      return `${formattedValue}K${suffix ? " " + suffix : ""}`;
+    } else if (lowerOriginal.includes("m")) {
+      const value = (currentNum / 1000000).toFixed(1);
+      const formattedValue = useComma ? value.replace(".", ",") : value;
+      return `${formattedValue}M${suffix ? " " + suffix : ""}`;
+    } else if (lowerOriginal.includes("jt")) {
+      const value = (currentNum / 1000000).toFixed(1);
+      const formattedValue = useComma ? value.replace(".", ",") : value;
+      return `${formattedValue} jt${suffix ? " " + suffix : ""}`;
+    } else if (
+      lowerOriginal.includes("b") ||
+      lowerOriginal.includes("miliar")
+    ) {
+      const value = (currentNum / 1000000000).toFixed(1);
+      const formattedValue = useComma ? value.replace(".", ",") : value;
+      return `${formattedValue}B${suffix ? " " + suffix : ""}`;
+    }
+
+    // Format full number
+    let formattedNumber: string;
+    if (useComma) {
+      // Format dengan koma: 4,055 (gunakan en-US lalu ganti titik dengan koma)
+      formattedNumber = currentNum.toLocaleString("en-US").replace(/\./g, ",");
+    } else {
+      // Format dengan titik: 4.055 (gunakan de-DE atau manual)
+      formattedNumber = currentNum.toLocaleString("de-DE");
+    }
+
+    return `${formattedNumber}${suffix ? " " + suffix : ""}`;
+  };
+
+  const animateViewCount = (
+    element: HTMLElement,
+    fromValue: number,
+    toValue: number,
+    originalFormat: string,
+    useComma: boolean,
+  ) => {
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+    }
+
+    const diff = Math.abs(toValue - fromValue);
+    const duration =
+      diff < 10 ? 400 : Math.min(1400, 500 + Math.log10(diff + 1) * 300);
+
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = easeOutExpo(progress);
+      const currentValue = Math.round(lerp(fromValue, toValue, eased));
+
+      element.textContent = formatViewCount(
+        currentValue,
+        originalFormat,
+        useComma,
+      );
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        element.textContent = formatViewCount(
+          toValue,
+          originalFormat,
+          useComma,
+        );
+        currentViewCount = toValue;
+        animationFrameId = null;
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+  };
+
+  // ===== Display Functions =====
+  const displayVideoInfo = async (
+    viewCount: string,
+    dateText: string,
+    isUpdate: boolean = false,
+  ) => {
+    const viewCountData = parseViewCountData(viewCount);
+    const newViewCount = viewCountData.count;
+
+    const existingInfo = document.getElementById("yt-enhancer-video-info");
+    const viewCountElement = document.getElementById("yt-enhancer-view-count");
+
+    // Update existing element
+    if (isUpdate && existingInfo && viewCountElement) {
+      if (newViewCount !== currentViewCount && currentViewCount > 0) {
+        animateViewCount(
+          viewCountElement,
+          currentViewCount,
+          newViewCount,
+          viewCountData.formatted,
+          viewCountData.useComma,
+        );
+      } else {
+        viewCountElement.textContent = viewCountData.formatted;
+        currentViewCount = newViewCount;
+      }
+
+      const dateTextElement = document.getElementById("yt-enhancer-date-text");
+      if (dateTextElement) {
+        dateTextElement.textContent = dateText;
+      }
+      return;
+    }
+
+    // Create new element
+    if (existingInfo) existingInfo.remove();
+    currentViewCount = newViewCount;
+
+    const titleElement = await waitForElement("#above-the-fold > div#title");
+    if (!titleElement) {
+      console.warn("Title element not found");
+      return;
+    }
+
+    const infoWrapper = document.createElement("div");
+    infoWrapper.id = "yt-enhancer-video-info";
+    infoWrapper.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 0.4rem;
+    `;
+
+    const infoContainer = document.createElement("div");
+    infoContainer.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.8rem 1.2rem;
+      font-size: 1.6rem;
+      color: var(--yt-spec-text-primary);
+      font-family: "Roboto", "Arial", sans-serif;
+      font-weight: 600;
+      background: rgba(255,255,255,.1);
+      border-radius: 2rem;
+    `;
+
+    const viewCountSpan = document.createElement("span");
+    viewCountSpan.id = "yt-enhancer-view-count";
+    viewCountSpan.textContent = viewCountData.formatted;
+    viewCountSpan.style.fontVariantNumeric = "tabular-nums";
+
+    const separator = document.createElement("span");
+    separator.textContent = "•";
+
+    const dateTextSpan = document.createElement("span");
+    dateTextSpan.id = "yt-enhancer-date-text";
+    dateTextSpan.textContent = dateText;
+
+    infoContainer.append(viewCountSpan, separator, dateTextSpan);
+
+    const refreshButton = document.createElement("button");
+    refreshButton.id = "yt-enhancer-refresh-btn";
+    refreshButton.innerHTML = `
+      <svg height="24" viewBox="0 0 24 24" width="24" focusable="false">
+        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"></path>
+      </svg>
+    `;
+    refreshButton.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.8rem;
+      background: rgba(255,255,255,.1);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--yt-spec-text-primary);
+      transition: all 0.2s ease;
+      width: 40px;
+      height: 40px;
+    `;
+
+    refreshButton.onmouseenter = () =>
+      (refreshButton.style.background = "rgba(255,255,255,.2)");
+    refreshButton.onmouseleave = () =>
+      (refreshButton.style.background = "rgba(255,255,255,.1)");
+
+    refreshButton.onclick = async () => {
+      refreshButton.style.pointerEvents = "none";
+      refreshButton.style.opacity = "0.5";
+
+      const svg = refreshButton.querySelector("svg");
+      if (svg) {
+        svg.style.transition = "transform 0.5s ease";
+        svg.style.transform = "rotate(360deg)";
+      }
+
+      await fetchAndLogVideoData(true);
+
+      setTimeout(() => {
+        refreshButton.style.pointerEvents = "auto";
+        refreshButton.style.opacity = "1";
+        if (svg) svg.style.transform = "rotate(0deg)";
+      }, 500);
+    };
+
+    infoWrapper.append(infoContainer, refreshButton);
+    titleElement.insertAdjacentElement("afterend", infoWrapper);
+  };
+
+  // ===== YouTube Data Functions =====
   const parseYTData = (html: string) => {
     const initialDataMatch = html.match(/var ytInitialData\s*=\s*(\{.*?\});/);
     const initialPlayerResponseMatch = html.match(
@@ -41,13 +335,63 @@ export const watchFeature = (() => {
     ytInitialData = initialDataMatch?.[1] ?? null;
     ytInitialPlayerResponse = initialPlayerResponseMatch?.[1] ?? null;
 
-    return {
-      ytInitialData,
-      ytInitialPlayerResponse,
-    };
+    return { ytInitialData, ytInitialPlayerResponse };
   };
 
-  const fetchAndLogVideoData = async () => {
+  const fetchVideoData = async (url: string) => {
+    const html = await fetchData(url);
+    return parseYTData(html);
+  };
+
+  const setVideoState = (
+    microformat: PlayerMicroformatRenderer,
+    videoDetails: InitialPlayerResponseVideoDetails,
+  ) => {
+    const liveDetails = microformat?.liveBroadcastDetails;
+
+    if (liveDetails?.isLiveNow === true) {
+      videoState = 3; // live now
+    } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
+      videoState = 2; // was live
+    } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
+      videoState = 4; // upcoming
+    } else {
+      videoState = 1; // not live
+    }
+  };
+
+  const getViewCount = (data: InitialData) => {
+    const content =
+      data.contents.twoColumnWatchNextResults.results.results.contents[0]
+        ?.videoPrimaryInfoRenderer?.viewCount.videoViewCountRenderer.viewCount;
+
+    if (videoState === 4 || videoState === 3) {
+      return content?.runs?.map((r) => r.text).join("");
+    }
+    return content?.simpleText;
+  };
+
+  const getDateText = (
+    ytInitialData: InitialData,
+    ytInitialPlayerResponse: InitialPlayerResponse,
+  ) => {
+    if (videoState === 4) {
+      return ytInitialPlayerResponse.playabilityStatus.liveStreamability?.liveStreamabilityRenderer.offlineSlate?.liveStreamOfflineSlateRenderer.mainText.runs
+        ?.map((r) => r.text)
+        .join("");
+    }
+
+    const content =
+      ytInitialData.contents.twoColumnWatchNextResults.results.results
+        .contents[0]?.videoPrimaryInfoRenderer;
+
+    if (videoState === 3) {
+      return content?.dateText.simpleText;
+    }
+    return content?.relativeDateText?.simpleText;
+  };
+
+  const fetchAndLogVideoData = async (isUpdate: boolean = false) => {
     const data = await fetchVideoData(location.href);
 
     if (data.ytInitialData && data.ytInitialPlayerResponse) {
@@ -62,112 +406,29 @@ export const watchFeature = (() => {
           ytInitialPlayerResponseObj.videoDetails,
         );
 
-        const title = ytInitialPlayerResponseObj.videoDetails.title;
         const viewCount = getViewCount(ytInitialDataObj);
-        const likeCount =
-          ytInitialPlayerResponseObj.microformat.playerMicroformatRenderer
-            .likeCount;
         const dateText = getDateText(
           ytInitialDataObj,
           ytInitialPlayerResponseObj,
         );
 
-        console.log("Video Title:", title);
+        console.log(
+          "Video Title:",
+          ytInitialPlayerResponseObj.videoDetails.title,
+        );
         console.log("View Count:", viewCount);
-        console.log("Like Count:", likeCount);
         console.log("Date Text:", dateText);
-        console.log("Full InitialData:", ytInitialDataObj);
-        console.log("Full InitialPlayerResponse:", ytInitialPlayerResponseObj);
+
+        if (viewCount && dateText) {
+          displayVideoInfo(viewCount, dateText, isUpdate);
+        }
       } catch (err) {
         console.warn("Failed to parse ytInitialData:", err);
       }
     }
   };
 
-  const setVideoState = (
-    initialPlayerMicroformat: PlayerMicroformatRenderer,
-    initialPlayerVideoDetails: InitialPlayerResponseVideoDetails,
-  ) => {
-    if (
-      initialPlayerMicroformat &&
-      initialPlayerMicroformat.liveBroadcastDetails &&
-      initialPlayerMicroformat.liveBroadcastDetails.isLiveNow == true
-    ) {
-      // is live now
-      videoState = 3;
-    } else if (
-      initialPlayerMicroformat &&
-      initialPlayerMicroformat.liveBroadcastDetails &&
-      initialPlayerMicroformat.liveBroadcastDetails.isLiveNow == false &&
-      !initialPlayerVideoDetails.isUpcoming
-    ) {
-      // was live
-      videoState = 2;
-    } else if (
-      initialPlayerMicroformat &&
-      initialPlayerVideoDetails &&
-      initialPlayerMicroformat.liveBroadcastDetails &&
-      initialPlayerMicroformat.liveBroadcastDetails.isLiveNow == false &&
-      initialPlayerVideoDetails.isUpcoming
-    ) {
-      // upcoming
-      videoState = 4;
-    } else {
-      // not live
-      videoState = 1;
-    }
-  };
-
-  const delay = (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  };
-
-  const getViewCount = (data: InitialData) => {
-    console.log("[getViewCount] videoState: ", videoState);
-    if (videoState == 4) {
-      return data.contents.twoColumnWatchNextResults.results.results.contents[0]?.videoPrimaryInfoRenderer?.viewCount.videoViewCountRenderer.viewCount.runs
-        ?.map((r) => r.text)
-        .join("");
-    } else if (videoState == 3) {
-      return data.contents.twoColumnWatchNextResults.results.results.contents[0]?.videoPrimaryInfoRenderer?.viewCount.videoViewCountRenderer.viewCount.runs
-        ?.map((r) => r.text)
-        .join("");
-    } else if (videoState == 2) {
-      return data.contents.twoColumnWatchNextResults.results.results.contents[0]
-        ?.videoPrimaryInfoRenderer?.viewCount.videoViewCountRenderer.viewCount
-        .simpleText;
-    } else {
-      return data.contents.twoColumnWatchNextResults.results.results.contents[0]
-        ?.videoPrimaryInfoRenderer?.viewCount.videoViewCountRenderer.viewCount
-        .simpleText;
-    }
-  };
-
-  const getDateText = (
-    ytInitialData: InitialData,
-    ytInitialPlayerResponse: InitialPlayerResponse,
-  ) => {
-    if (videoState == 4) {
-      return ytInitialPlayerResponse.playabilityStatus.liveStreamability?.liveStreamabilityRenderer.offlineSlate?.liveStreamOfflineSlateRenderer.mainText.runs
-        ?.map((r) => r.text)
-        .join("");
-    } else if (videoState == 3) {
-      return ytInitialData.contents.twoColumnWatchNextResults.results.results
-        .contents[0]?.videoPrimaryInfoRenderer?.dateText.simpleText;
-    } else if (videoState == 2) {
-      return ytInitialData.contents.twoColumnWatchNextResults.results.results
-        .contents[0]?.videoPrimaryInfoRenderer?.relativeDateText?.simpleText;
-    } else {
-      return ytInitialData.contents.twoColumnWatchNextResults.results.results
-        .contents[0]?.videoPrimaryInfoRenderer?.relativeDateText?.simpleText;
-    }
-  };
-
-  const fetchVideoData = async (url: string) => {
-    const html = await fetchData(url);
-    return parseYTData(html);
-  };
-
+  // ===== Player Functions =====
   const waitForPlayer = async (): Promise<YouTubePlayer> => {
     if (player) return player;
 
@@ -194,22 +455,20 @@ export const watchFeature = (() => {
   };
 
   const loopVideo = async (player: YouTubePlayer) => {
-    if (!autoLoopEnabled) return;
-    return player.setLoopVideo(true);
+    if (autoLoopEnabled) player.setLoopVideo(true);
   };
 
-  const setVideoResolution = async (player: YouTubePlayer, quality: string) => {
+  const setVideoResolution = async (player: YouTubePlayer) => {
     if (!qualityServiceEnabled) return;
 
     quality = (await storageBridge.get(qualityReferenceKey)) || "hd1080";
-    await player.setPlaybackQualityRange(quality);
-    return await delay(500);
+    await player.setPlaybackQualityRange(quality!);
+    await delay(500);
   };
 
   const watchVideoResolution = (player: YouTubePlayer) => {
     if (!player) return;
 
-    // Hapus listener lama jika ada
     if (qualityChangeListener) {
       player.removeEventListener(
         "onPlaybackQualityChange",
@@ -217,34 +476,28 @@ export const watchFeature = (() => {
       );
     }
 
-    // Hanya attach listener jika quality service enabled
     if (qualityServiceEnabled) {
       qualityChangeListener = (q: string) => {
-        console.log("Quality Changed: ", q);
-        saveResolution(q);
+        console.log("Quality Changed:", q);
+        if (q !== quality) {
+          quality = q;
+          storageBridge.set(qualityReferenceKey, q);
+        }
       };
       player.addEventListener("onPlaybackQualityChange", qualityChangeListener);
     }
   };
 
-  const saveResolution = async (q: string) => {
-    // Hanya save jika quality service enabled
-    if (!qualityServiceEnabled) return;
-    if (q == quality) return;
-
-    quality = q;
-    return await storageBridge.set(qualityReferenceKey, q);
-  };
-
   const qualityService = async (player: YouTubePlayer) => {
-    await setVideoResolution(player, quality!);
+    await setVideoResolution(player);
     watchVideoResolution(player);
   };
 
   const autoCaption = async (player: YouTubePlayer) => {
-    if (!autoCaptionEnabled) return;
-    player.toggleSubtitlesOn();
-    isCaptionActive = true;
+    if (autoCaptionEnabled) {
+      player.toggleSubtitlesOn();
+      isCaptionActive = true;
+    }
   };
 
   const handleVideo = async () => {
@@ -254,84 +507,83 @@ export const watchFeature = (() => {
     await autoCaption(player);
   };
 
-  // Listen to setting changes
+  // ===== Event Listeners =====
   const settingListener = (event: Event) => {
     const { setting, value } = (event as CustomEvent).detail;
 
     if (setting === "autoLoop") {
       autoLoopEnabled = value;
-      if (player) {
-        player.setLoopVideo(value);
-      }
+      if (player) player.setLoopVideo(value);
     } else if (setting === "qualityService") {
       const wasEnabled = qualityServiceEnabled;
       qualityServiceEnabled = value;
 
       if (player) {
         if (value && !wasEnabled) {
-          // Re-enable: apply saved quality dan attach listener
           qualityService(player);
-        } else if (!value && wasEnabled) {
-          // Disable: remove listener
-          if (qualityChangeListener) {
-            player.removeEventListener(
-              "onPlaybackQualityChange",
-              qualityChangeListener,
-            );
-            qualityChangeListener = null;
-          }
-        }
-      }
-    } else if (setting === "autoCaption") {
-      autoCaptionEnabled = value;
-      console.log("autoCaptionEnabled:", autoCaptionEnabled);
-
-      if (player) {
-        // Logika toggle berdasarkan state saat ini dan nilai yang diinginkan
-        if (value && !isCaptionActive) {
-          // User mau nyalakan, tapi caption masih mati -> nyalakan
-          player.toggleSubtitlesOn();
-          isCaptionActive = true;
-        } else if (!value && isCaptionActive) {
-          // User mau matikan, tapi caption masih nyala -> matikan dengan toggle
-          player.toggleSubtitles();
-          isCaptionActive = false;
-        }
-        // Jika value === isCaptionActive, tidak perlu action (sudah sesuai)
-      }
-    }
-  };
-
-  return {
-    match: (path: string) => path === "/watch",
-
-    init: async () => {
-      initConfig();
-
-      videoId = getVideoId();
-      console.log("videoId:", videoId);
-
-      window.addEventListener("yt-enhancer-setting", settingListener);
-
-      handleVideo();
-      fetchAndLogVideoData();
-
-      return () => {
-        window.removeEventListener("yt-enhancer-setting", settingListener);
-        if (player && qualityChangeListener) {
+        } else if (!value && wasEnabled && qualityChangeListener) {
           player.removeEventListener(
             "onPlaybackQualityChange",
             qualityChangeListener,
           );
           qualityChangeListener = null;
         }
+      }
+    } else if (setting === "autoCaption") {
+      autoCaptionEnabled = value;
+
+      if (player) {
+        if (value && !isCaptionActive) {
+          player.toggleSubtitlesOn();
+          isCaptionActive = true;
+        } else if (!value && isCaptionActive) {
+          player.toggleSubtitles();
+          isCaptionActive = false;
+        }
+      }
+    }
+  };
+
+  // ===== Module Interface =====
+  return {
+    match: (path: string) => path === "/watch",
+
+    init: async () => {
+      videoId = getVideoId();
+      console.log("videoId:", videoId);
+
+      await initConfig();
+      fetchAndLogVideoData();
+      window.addEventListener("yt-enhancer-setting", settingListener);
+      handleVideo();
+
+      return () => {
+        window.removeEventListener("yt-enhancer-setting", settingListener);
+
+        if (player && qualityChangeListener) {
+          player.removeEventListener(
+            "onPlaybackQualityChange",
+            qualityChangeListener,
+          );
+        }
+
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+        }
+
+        document.getElementById("yt-enhancer-video-info")?.remove();
+
         videoId = null;
         ytInitialPlayerResponse = null;
         ytInitialData = null;
         videoState = null;
         player = null;
         quality = null;
+        qualityChangeListener = null;
         isCaptionActive = false;
+        currentViewCount = 0;
+        animationFrameId = null;
+
         console.log("watch feature destroyed");
       };
     },
