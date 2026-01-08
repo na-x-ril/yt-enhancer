@@ -6026,3 +6026,38 @@ export interface InitialPlayerResponseVideoDetails {
   isLiveContent: boolean;
   isUpcoming?: boolean;
 }
+
+// ===== Type Definitions =====
+export interface UpdateViewershipAction {
+  updateViewershipAction?: {
+    viewCount?: {
+      videoViewCountRenderer?: {
+        viewCount?: {
+          simpleText?: string;
+          runs?: Array<{ text: string }>;
+        };
+        isLive?: boolean;
+        extraShortViewCount?: {
+          simpleText?: string;
+        };
+        unlabeledViewCountValue?: {
+          simpleText?: string;
+        };
+        originalViewCount?: string;
+      };
+    };
+  };
+}
+
+export interface UpdateDateTextAction {
+  updateDateTextAction?: {
+    dateText?: {
+      simpleText?: string;
+      runs?: Array<{ text: string }>;
+    };
+  };
+}
+
+export interface YouTubeUpdateResponse {
+  actions?: Array<UpdateViewershipAction | UpdateDateTextAction>;
+}

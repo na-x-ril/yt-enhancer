@@ -6,7 +6,12 @@ import type {
   PlayerMicroformatRenderer,
 } from "@/content-scripts/youtube/types";
 import { storageBridge } from "../../bridge/bridge";
-import type { InitialPlayerResponseVideoDetails } from "../../types/videoData";
+import type {
+  InitialPlayerResponseVideoDetails,
+  UpdateDateTextAction,
+  UpdateViewershipAction,
+  YouTubeUpdateResponse,
+} from "../../types/videoData";
 
 export const watchFeature = (() => {
   let videoId: string | null = null;
@@ -66,6 +71,129 @@ export const watchFeature = (() => {
     });
   };
 
+  // ===== Network Intercept Functions =====
+  const setupNetworkIntercept = () => {
+    const originalFetch = window.fetch;
+
+    const fetchProxy = new Proxy(originalFetch, {
+      apply: async (
+        target,
+        thisArg,
+        args: [RequestInfo | URL, RequestInit?],
+      ) => {
+        const [input, init] = args;
+        const response = await Reflect.apply(target, thisArg, args);
+
+        // Check if this is an updated metadata request
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : (input as Request).url;
+
+        if (url?.includes("/youtubei/v1/updated_metadata")) {
+          try {
+            const clone = response.clone();
+            const data: YouTubeUpdateResponse = await clone.json();
+
+            if (data.actions) {
+              handleYouTubeUpdate(data.actions);
+            }
+          } catch (err) {
+            console.warn("Failed to parse update response:", err);
+          }
+        }
+
+        return response;
+      },
+    });
+
+    window.fetch = fetchProxy as typeof window.fetch;
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  };
+
+  const handleYouTubeUpdate = (
+    actions: Array<UpdateViewershipAction | UpdateDateTextAction>,
+  ) => {
+    let newViewCount: string | undefined;
+    let newDateText: string | undefined;
+
+    for (const action of actions) {
+      // Extract view count
+      if ("updateViewershipAction" in action) {
+        const viewCountData =
+          action.updateViewershipAction?.viewCount?.videoViewCountRenderer
+            ?.viewCount;
+
+        if (viewCountData) {
+          if (viewCountData.simpleText) {
+            newViewCount = viewCountData.simpleText;
+          } else if (viewCountData.runs) {
+            newViewCount = viewCountData.runs.map((r) => r.text).join("");
+          }
+        }
+      }
+
+      // Extract date text
+      if ("updateDateTextAction" in action) {
+        const dateTextData = action.updateDateTextAction?.dateText;
+
+        if (dateTextData) {
+          if (dateTextData.simpleText) {
+            newDateText = dateTextData.simpleText;
+          } else if (dateTextData.runs) {
+            newDateText = dateTextData.runs.map((r) => r.text).join("");
+          }
+        }
+      }
+    }
+
+    // Update display if we have new data
+    if (newViewCount || newDateText) {
+      const existingInfo = document.getElementById("yt-enhancer-video-info");
+      if (existingInfo) {
+        if (newViewCount) {
+          const viewCountData = parseViewCountData(newViewCount);
+          const viewCountElement = document.getElementById(
+            "yt-enhancer-view-count",
+          );
+
+          if (
+            viewCountElement &&
+            viewCountData.count !== currentViewCount &&
+            currentViewCount > 0
+          ) {
+            console.log("Auto-updating view count:", newViewCount);
+            animateViewCount(
+              viewCountElement,
+              currentViewCount,
+              viewCountData.count,
+              viewCountData.formatted,
+              viewCountData.useComma,
+            );
+          } else if (viewCountElement) {
+            viewCountElement.textContent = viewCountData.formatted;
+            currentViewCount = viewCountData.count;
+          }
+        }
+
+        if (newDateText) {
+          const dateTextElement = document.getElementById(
+            "yt-enhancer-date-text",
+          );
+          if (dateTextElement) {
+            console.log("Auto-updating date text:", newDateText);
+            dateTextElement.textContent = newDateText;
+          }
+        }
+      }
+    }
+  };
+
   // ===== Animation Functions =====
   const lerp = (start: number, end: number, t: number): number => {
     return start + (end - start) * t;
@@ -83,7 +211,6 @@ export const watchFeature = (() => {
     const formatted = viewCountStr;
     const lowerStr = viewCountStr.toLowerCase();
 
-    // Deteksi apakah menggunakan koma sebagai thousand separator
     const useComma =
       viewCountStr.includes(",") && !viewCountStr.match(/\d+\.\d+[KMB]/i);
 
@@ -161,8 +288,10 @@ export const watchFeature = (() => {
     }
 
     const diff = Math.abs(toValue - fromValue);
-    const duration =
+    const base =
       diff < 10 ? 400 : Math.min(1400, 500 + Math.log10(diff + 1) * 300);
+
+    const duration = base + 200 * Math.min(1, Math.log10(diff + 1));
 
     const startTime = performance.now();
 
@@ -553,6 +682,9 @@ export const watchFeature = (() => {
       console.log("videoId:", videoId);
 
       await initConfig();
+
+      const cleanupIntercept = setupNetworkIntercept();
+
       fetchAndLogVideoData();
       window.addEventListener("yt-enhancer-setting", settingListener);
       handleVideo();
@@ -570,6 +702,8 @@ export const watchFeature = (() => {
         if (animationFrameId !== null) {
           cancelAnimationFrame(animationFrameId);
         }
+
+        cleanupIntercept();
 
         document.getElementById("yt-enhancer-video-info")?.remove();
 
