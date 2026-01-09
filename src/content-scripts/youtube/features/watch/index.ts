@@ -31,6 +31,7 @@ export const watchFeature = (() => {
 
   // Animation state
   let currentViewCount = 0;
+  let currentDateText = "";
   let animationFrameId: number | null = null;
 
   // ===== Utility Functions =====
@@ -181,7 +182,7 @@ export const watchFeature = (() => {
           }
         }
 
-        if (newDateText) {
+        if (newDateText && newDateText !== currentDateText) {
           const dateTextElement = document.getElementById(
             "yt-enhancer-date-text",
           );
@@ -353,6 +354,7 @@ export const watchFeature = (() => {
       const dateTextElement = document.getElementById("yt-enhancer-date-text");
       if (dateTextElement) {
         dateTextElement.textContent = dateText;
+        currentDateText = dateText;
       }
       return;
     }
@@ -360,6 +362,7 @@ export const watchFeature = (() => {
     // Create new element
     if (existingInfo) existingInfo.remove();
     currentViewCount = newViewCount;
+    currentDateText = dateText;
 
     const titleElement = await waitForElement("#above-the-fold > div#title");
     if (!titleElement) {
@@ -716,6 +719,7 @@ export const watchFeature = (() => {
         qualityChangeListener = null;
         isCaptionActive = false;
         currentViewCount = 0;
+        currentDateText = "";
         animationFrameId = null;
 
         console.log("watch feature destroyed");

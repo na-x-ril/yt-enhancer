@@ -48,8 +48,7 @@ for (const entry of STATIC_ENTRIES) {
   }
 }
 
-// SITES TO BUILD
-const SITES = ["youtube"];
+const SITES = await readdir("src/content-scripts");
 
 for (const site of SITES) {
   console.log(`\n📦 bundle ${site}...`);
