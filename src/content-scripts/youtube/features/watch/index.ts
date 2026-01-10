@@ -98,7 +98,7 @@ export const watchFeature = (() => {
   };
 
   const restoreLastTime = async () => {
-    if (!player || !videoId || isLive) return;
+    if (!player || !videoId || isLiveNow) return;
 
     try {
       const savedTime = await storageBridge.get(`video_time_${videoId}`);
@@ -573,7 +573,6 @@ export const watchFeature = (() => {
     if (liveDetails?.isLiveNow === true) {
       videoState = 3; // live now
       isLiveNow = true;
-      F;
     } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
       videoState = 2; // was live
     } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
