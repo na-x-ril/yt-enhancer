@@ -12,13 +12,13 @@ export const livechatFeature = (() => {
     selector: string,
     timeout: number = 5000,
   ): Promise<T | null> => {
-    const element = document.querySelector(selector) as T;
+    const element = document.querySelector<T>(selector);
     if (element) return element;
 
     return new Promise((resolve) => {
       const startTime = Date.now();
       const observer = new MutationObserver(() => {
-        const element = document.querySelector(selector) as T;
+        const element = document.querySelector<T>(selector);
         if (element || Date.now() - startTime > timeout) {
           observer.disconnect();
           resolve(element);
