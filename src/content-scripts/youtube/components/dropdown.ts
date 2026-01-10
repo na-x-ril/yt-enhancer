@@ -128,14 +128,16 @@ export class Dropdown {
     });
 
     // Toggle switch handlers
-    const toggleItems = this.menu?.querySelectorAll(".toggle-item");
+    const toggleItems =
+      this.menu?.querySelectorAll<HTMLDivElement>(".toggle-item");
     toggleItems?.forEach((item) => {
       item.addEventListener("click", () => {
         const id = item.getAttribute("data-id");
         if (!id) return;
 
-        const toggleSwitch = item.querySelector(".toggle-switch");
-        const toggleKnob = item.querySelector(".toggle-knob") as HTMLElement;
+        const toggleSwitch =
+          item.querySelector<HTMLDivElement>(".toggle-switch");
+        const toggleKnob = item.querySelector<HTMLDivElement>(".toggle-knob");
 
         if (!toggleSwitch || !toggleKnob) return;
 
@@ -177,7 +179,7 @@ export class Dropdown {
   }
 
   private toggleMenu() {
-    const svg = this.button?.querySelector("svg");
+    const svg = this.button?.querySelector<SVGElement>("svg");
 
     if (this.isOpen) {
       this.closeMenu();
@@ -193,7 +195,7 @@ export class Dropdown {
   }
 
   private closeMenu() {
-    const svg = this.button?.querySelector("svg");
+    const svg = this.button?.querySelector<SVGElement>("svg");
 
     if (this.menu) {
       this.menu.style.display = "none";
@@ -220,14 +222,14 @@ export class Dropdown {
 
   inject() {
     // Inject button ke #end
-    const targetButton = document.querySelector("#end");
+    const targetButton = document.querySelector<HTMLDivElement>("#end");
     if (targetButton && this.container) {
       targetButton.insertAdjacentElement("afterbegin", this.container);
     }
 
     // Inject menu ke ytd-popup-container
     const waitForPopupContainer = setInterval(() => {
-      const popupContainer = document.querySelector(
+      const popupContainer = document.querySelector<Element>(
         "ytd-popup-container.style-scope",
       );
       if (popupContainer && this.menu) {

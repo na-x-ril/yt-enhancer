@@ -517,7 +517,7 @@ export const watchFeature = (() => {
       refreshButton.style.pointerEvents = "none";
       refreshButton.style.opacity = "0.5";
 
-      const svg = refreshButton.querySelector("svg");
+      const svg = refreshButton.querySelector<SVGElement>("svg");
       if (svg) {
         svg.style.transition = "transform 0.5s ease";
         svg.style.transform = "rotate(360deg)";
