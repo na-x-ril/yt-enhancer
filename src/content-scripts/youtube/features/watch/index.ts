@@ -21,7 +21,7 @@ export const watchFeature = (() => {
   let player: YouTubePlayer | null = null;
   let quality: string | null;
   let qualityReferenceKey = "quality_reference";
-  let isLive: boolean = false;
+  let isLiveNow: boolean = false;
 
   // Config state
   let autoLoopEnabled = true;
@@ -572,7 +572,8 @@ export const watchFeature = (() => {
 
     if (liveDetails?.isLiveNow === true) {
       videoState = 3; // live now
-      isLive = true;
+      isLiveNow = true;
+      F;
     } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
       videoState = 2; // was live
     } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
@@ -844,7 +845,7 @@ export const watchFeature = (() => {
         player = null;
         quality = null;
         qualityChangeListener = null;
-        isLive = false;
+        isLiveNow = false;
         isCaptionActive = false;
         currentViewCount = 0;
         currentDateText = "";
