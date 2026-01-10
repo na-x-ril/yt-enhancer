@@ -34,6 +34,11 @@ export const watchFeature = (() => {
   let currentDateText = "";
   let animationFrameId: number | null = null;
 
+  // time tracking
+  let lastSavedTime = 0;
+  let videoStartTime = 0;
+  let cleanupTimeTracking: (() => void) | null = null;
+
   // ===== Utility Functions =====
   const fetchData = async (url: string) => {
     const res = await fetch(url);
@@ -70,6 +75,80 @@ export const watchFeature = (() => {
         resolve(null);
       }, timeout);
     });
+  };
+
+  const saveCurrentTime = async () => {
+    if (!player || !videoId) return;
+
+    try {
+      const currentTime = player.getCurrentTime();
+      if (currentTime && currentTime > 0) {
+        await storageBridge.set(`video_time_${videoId}`, currentTime);
+        lastSavedTime = currentTime;
+        console.log(`Saved time: ${currentTime}s for video ${videoId}`);
+      }
+    } catch (err) {
+      console.warn("Failed to save current time:", err);
+    }
+  };
+
+  const restoreLastTime = async () => {
+    if (!player || !videoId) return;
+
+    try {
+      const savedTime = await storageBridge.get(`video_time_${videoId}`);
+      if (savedTime && savedTime > 0) {
+        player.seekTo(savedTime, true);
+        console.log(`Restored time: ${savedTime}s for video ${videoId}`);
+      }
+    } catch (err) {
+      console.warn("Failed to restore time:", err);
+    }
+  };
+
+  const setupTimeTracking = (player: YouTubePlayer) => {
+    // 1. Save saat video di-pause
+    const onPause = () => {
+      saveCurrentTime();
+    };
+
+    // // 2. Save saat video playing (setiap timeupdate)
+    // const onTimeUpdate = () => {
+    //   const currentTime = player.getCurrentTime();
+    //   // Simpan setiap 5 detik perubahan
+    //   if (Math.abs(currentTime - lastSavedTime) >= 5) {
+    //     saveCurrentTime();
+    //   }
+    // };
+
+    // // 3. Save saat user seek
+    // const onSeek = () => {
+    //   saveCurrentTime();
+    // };
+
+    // 4. Save saat state berubah
+    const onStateChange = (state: number) => {
+      // State: 0 (ended), 1 (playing), 2 (paused)
+      if (state === 2 || state === 0) {
+        saveCurrentTime();
+      }
+    };
+
+    player.addEventListener("onPause", onPause);
+    player.addEventListener("onStateChange", onStateChange);
+
+    // // Gunakan VideoProgress untuk tracking waktu
+    // const progressListener = () => {
+    //   onTimeUpdate();
+    // };
+    // player.addEventListener("onVideoProgress", progressListener);
+
+    // Cleanup function
+    return () => {
+      player.removeEventListener("onPause", onPause);
+      player.removeEventListener("onStateChange", onStateChange);
+      // player.removeEventListener("onVideoProgress", progressListener);
+    };
   };
 
   // ===== Network Intercept Functions =====
@@ -569,11 +648,29 @@ export const watchFeature = (() => {
         player = document.getElementById(
           "movie_player",
         ) as unknown as YouTubePlayer;
-        if (player) {
+        if (player && typeof player.getPlayerState === "function") {
           clearInterval(interval);
           resolve(player);
         }
       }, 100);
+
+      setTimeout(() => clearInterval(interval), 5000);
+    });
+  };
+
+  const waitForPlayerReady = async (player: YouTubePlayer): Promise<void> => {
+    return new Promise((resolve) => {
+      if (player.getPlayerState?.() !== undefined) {
+        resolve();
+        return;
+      }
+
+      const onReady = () => {
+        player.removeEventListener("onReady", onReady);
+        resolve();
+      };
+
+      player.addEventListener("onReady", onReady);
     });
   };
 
@@ -595,7 +692,7 @@ export const watchFeature = (() => {
 
     quality = (await storageBridge.get(qualityReferenceKey)) || "hd1080";
     await player.setPlaybackQualityRange(quality!);
-    await delay(500);
+    await delay(1000);
   };
 
   const watchVideoResolution = (player: YouTubePlayer) => {
@@ -634,9 +731,14 @@ export const watchFeature = (() => {
 
   const handleVideo = async () => {
     const player = await waitForPlayer();
+    await waitForPlayerReady(player);
+
     await loopVideo(player);
     await qualityService(player);
     await autoCaption(player);
+
+    cleanupTimeTracking = setupTimeTracking(player);
+    await restoreLastTime();
   };
 
   // ===== Event Listeners =====
@@ -683,7 +785,6 @@ export const watchFeature = (() => {
     init: async () => {
       videoId = getVideoId();
       console.log("videoId:", videoId);
-
       await initConfig();
 
       const cleanupIntercept = setupNetworkIntercept();
@@ -692,7 +793,26 @@ export const watchFeature = (() => {
       window.addEventListener("yt-enhancer-setting", settingListener);
       handleVideo();
 
+      const handleBeforeUnload = () => {
+        saveCurrentTime();
+      };
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          saveCurrentTime();
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
       return () => {
+        saveCurrentTime();
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange,
+        );
+
         window.removeEventListener("yt-enhancer-setting", settingListener);
 
         if (player && qualityChangeListener) {
@@ -700,6 +820,11 @@ export const watchFeature = (() => {
             "onPlaybackQualityChange",
             qualityChangeListener,
           );
+        }
+
+        if (cleanupTimeTracking) {
+          cleanupTimeTracking();
+          cleanupTimeTracking = null;
         }
 
         if (animationFrameId !== null) {
@@ -721,6 +846,7 @@ export const watchFeature = (() => {
         currentViewCount = 0;
         currentDateText = "";
         animationFrameId = null;
+        lastSavedTime = 0;
 
         console.log("watch feature destroyed");
       };
