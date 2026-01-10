@@ -12,6 +12,13 @@ import type {
   UpdateViewershipAction,
   YouTubeUpdateResponse,
 } from "../../types/videoData";
+import {
+  delay,
+  fetchData,
+  getVideoId,
+  waitForElement,
+  waitForPlayer,
+} from "../../utils";
 
 export const watchFeature = (() => {
   let videoId: string | null = null;
@@ -38,44 +45,6 @@ export const watchFeature = (() => {
   // time tracking
   let lastSavedTime = 0;
   let cleanupTimeTracking: (() => void) | null = null;
-
-  // ===== Utility Functions =====
-  const fetchData = async (url: string) => {
-    const res = await fetch(url);
-    return res.text();
-  };
-
-  const delay = (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  };
-
-  const getVideoId = () =>
-    new URLSearchParams(new URL(location.href).search).get("v");
-
-  const waitForElement = async <T extends Element>(
-    selector: string,
-    timeout: number = 5000,
-  ): Promise<T | null> => {
-    const element = document.querySelector<T>(selector);
-    if (element) return element;
-
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-      const observer = new MutationObserver(() => {
-        const element = document.querySelector<T>(selector);
-        if (element || Date.now() - startTime > timeout) {
-          observer.disconnect();
-          resolve(element);
-        }
-      });
-
-      observer.observe(document.body, { childList: true, subtree: true });
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(null);
-      }, timeout);
-    });
-  };
 
   const saveCurrentTime = async () => {
     if (!player || !videoId) return;
@@ -650,41 +619,6 @@ export const watchFeature = (() => {
     }
   };
 
-  const waitForPlayer = async (): Promise<YouTubePlayer> => {
-    if (player) return player;
-
-    const element = await waitForElement<HTMLElement>("#movie_player");
-
-    if (!element) {
-      throw new Error("Player element not found");
-    }
-
-    player = element as unknown as YouTubePlayer;
-
-    return new Promise((resolve) => {
-      const checkReady = setInterval(() => {
-        if (typeof player!.getPlayerState === "function") {
-          clearInterval(checkReady);
-          resolve(player!);
-        }
-      }, 100);
-
-      setTimeout(() => {
-        clearInterval(checkReady);
-        resolve(player!);
-      }, 3000);
-    });
-  };
-
-  const initConfig = async () => {
-    const config = await storageBridge.get("dropdown_config");
-    if (config) {
-      autoLoopEnabled = config.autoLoop ?? true;
-      qualityServiceEnabled = config.qualityService ?? true;
-      autoCaptionEnabled = config.autoCaption ?? true;
-    }
-  };
-
   const loopVideo = async (player: YouTubePlayer) => {
     if (autoLoopEnabled) player.setLoopVideo(true);
   };
@@ -731,8 +665,17 @@ export const watchFeature = (() => {
     }
   };
 
+  const initConfig = async () => {
+    const config = await storageBridge.get("dropdown_config");
+    if (config) {
+      autoLoopEnabled = config.autoLoop ?? true;
+      qualityServiceEnabled = config.qualityService ?? true;
+      autoCaptionEnabled = config.autoCaption ?? true;
+    }
+  };
+
   const handleVideo = async () => {
-    const player = await waitForPlayer();
+    player = await waitForPlayer();
     if (!player) return;
 
     await loopVideo(player);

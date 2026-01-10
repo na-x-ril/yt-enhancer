@@ -1,37 +1,9 @@
+import { delay, waitForElement } from "../../utils";
+
 // src/content-scripts/youtube/features/livechat/index.ts
 export const livechatFeature = (() => {
   let isInitialized = false;
   let allChatButton: HTMLButtonElement | null = null;
-
-  // ===== Utility Functions =====
-  const delay = (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  };
-
-  const waitForElement = async <T extends Element>(
-    selector: string,
-    timeout: number = 5000,
-  ): Promise<T | null> => {
-    const element = document.querySelector<T>(selector);
-    if (element) return element;
-
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-      const observer = new MutationObserver(() => {
-        const element = document.querySelector<T>(selector);
-        if (element || Date.now() - startTime > timeout) {
-          observer.disconnect();
-          resolve(element);
-        }
-      });
-
-      observer.observe(document.body, { childList: true, subtree: true });
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(null);
-      }, timeout);
-    });
-  };
 
   // ===== Main Functions =====
   const clickAllChatButton = async () => {

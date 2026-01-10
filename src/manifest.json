@@ -20,7 +20,7 @@
       "run_at": "document_start"
     },
     {
-      "matches": ["*://*.youtube.com/*"],
+      "matches": ["*://www.youtube.com/*"],
       "js": ["youtube/index.js"],
       "css": ["youtube/style.css"],
       "run_at": "document_idle",
