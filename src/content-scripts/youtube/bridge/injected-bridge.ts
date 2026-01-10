@@ -31,5 +31,40 @@ import browser from "webextension-polyfill";
         "*",
       );
     }
+
+    // Handle REMOVE request
+    if (event.data.type === "YT_ENHANCER_REMOVE") {
+      await browser.storage.local.remove(event.data.key);
+      window.postMessage(
+        {
+          type: "YT_ENHANCER_REMOVE_RESPONSE",
+          key: event.data.key,
+        },
+        "*",
+      );
+    }
+
+    // Handle CLEAR request
+    if (event.data.type === "YT_ENHANCER_CLEAR") {
+      await browser.storage.local.clear();
+      window.postMessage(
+        {
+          type: "YT_ENHANCER_CLEAR_RESPONSE",
+        },
+        "*",
+      );
+    }
+
+    // Handle GET_ALL request
+    if (event.data.type === "YT_ENHANCER_GET_ALL") {
+      const result = await browser.storage.local.get(null);
+      window.postMessage(
+        {
+          type: "YT_ENHANCER_GET_ALL_RESPONSE",
+          value: result,
+        },
+        "*",
+      );
+    }
   });
 })();
