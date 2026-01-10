@@ -90,5 +90,9 @@ body {
     .ytp-delhi-modern .ytp-time-wrapper:not(.ytp-miniplayer-ui *) {
       backdrop-filter: blur(8px) !important;
     }
+
+    #ytd-watch-info-text {
+      display: $display-hidden;
+    }
   }
 }

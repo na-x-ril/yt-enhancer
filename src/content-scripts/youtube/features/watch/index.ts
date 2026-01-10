@@ -21,6 +21,7 @@ export const watchFeature = (() => {
   let player: YouTubePlayer | null = null;
   let quality: string | null;
   let qualityReferenceKey = "quality_reference";
+  let isLive: boolean = false;
 
   // Config state
   let autoLoopEnabled = true;
@@ -36,7 +37,6 @@ export const watchFeature = (() => {
 
   // time tracking
   let lastSavedTime = 0;
-  let videoStartTime = 0;
   let cleanupTimeTracking: (() => void) | null = null;
 
   // ===== Utility Functions =====
@@ -82,7 +82,12 @@ export const watchFeature = (() => {
 
     try {
       const currentTime = player.getCurrentTime();
-      if (currentTime && currentTime > 0) {
+
+      if (
+        currentTime &&
+        currentTime > 0 &&
+        Math.abs(currentTime - lastSavedTime) >= 3
+      ) {
         await storageBridge.set(`video_time_${videoId}`, currentTime);
         lastSavedTime = currentTime;
         console.log(`Saved time: ${currentTime}s for video ${videoId}`);
@@ -279,8 +284,13 @@ export const watchFeature = (() => {
     return start + (end - start) * t;
   };
 
-  const easeOutExpo = (t: number): number => {
-    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  const easeInOutExpo = (t: number): number => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    if (t < 0.5) {
+      return Math.pow(2, 34 * t - 10) / 2;
+    }
+    return (2 - Math.pow(2, -34 * t + 10)) / 2;
   };
 
   const parseViewCountData = (
@@ -378,7 +388,7 @@ export const watchFeature = (() => {
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeOutExpo(progress);
+      const eased = easeInOutExpo(progress);
       const currentValue = Math.round(lerp(fromValue, toValue, eased));
 
       element.textContent = formatViewCount(
@@ -562,6 +572,7 @@ export const watchFeature = (() => {
 
     if (liveDetails?.isLiveNow === true) {
       videoState = 3; // live now
+      isLive = true;
     } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
       videoState = 2; // was live
     } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
@@ -833,6 +844,7 @@ export const watchFeature = (() => {
         player = null;
         quality = null;
         qualityChangeListener = null;
+        isLive = false;
         isCaptionActive = false;
         currentViewCount = 0;
         currentDateText = "";
