@@ -639,19 +639,29 @@ export const watchFeature = (() => {
     }
   };
 
-  const waitForPlayerReady = async (player: YouTubePlayer): Promise<void> => {
+  const waitForPlayer = async (): Promise<YouTubePlayer> => {
+    if (player) return player;
+
+    const element = await waitForElement<HTMLElement>("#movie_player");
+
+    if (!element) {
+      throw new Error("Player element not found");
+    }
+
+    player = element as unknown as YouTubePlayer;
+
     return new Promise((resolve) => {
-      if (player.getPlayerState?.() !== undefined) {
-        resolve();
-        return;
-      }
+      const checkReady = setInterval(() => {
+        if (typeof player!.getPlayerState === "function") {
+          clearInterval(checkReady);
+          resolve(player!);
+        }
+      }, 100);
 
-      const onReady = () => {
-        player.removeEventListener("onReady", onReady);
-        resolve();
-      };
-
-      player.addEventListener("onReady", onReady);
+      setTimeout(() => {
+        clearInterval(checkReady);
+        resolve(player!);
+      }, 3000);
     });
   };
 
@@ -711,12 +721,8 @@ export const watchFeature = (() => {
   };
 
   const handleVideo = async () => {
-    const player = (await waitForElement<HTMLElement>(
-      "movie_player",
-    )) as unknown as YouTubePlayer;
+    const player = await waitForPlayer();
     if (!player) return;
-
-    await waitForPlayerReady(player);
 
     await loopVideo(player);
     await qualityService(player);
