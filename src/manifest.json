@@ -15,6 +15,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*"],
+      "exclude_matches": ["*://*.youtube.com/live_chat*"],
       "js": ["youtube/injected-bridge.js"],
       "run_at": "document_start"
     },
@@ -23,6 +24,7 @@
       "js": ["youtube/index.js"],
       "css": ["youtube/style.css"],
       "run_at": "document_idle",
+      "all_frames": true,
       "world": "MAIN"
     }
   ],

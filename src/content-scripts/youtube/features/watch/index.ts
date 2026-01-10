@@ -52,17 +52,17 @@ export const watchFeature = (() => {
   const getVideoId = () =>
     new URLSearchParams(new URL(location.href).search).get("v");
 
-  const waitForElement = async (
+  const waitForElement = async <T extends Element>(
     selector: string,
     timeout: number = 5000,
-  ): Promise<Element | null> => {
-    const element = document.querySelector(selector);
+  ): Promise<T | null> => {
+    const element = document.querySelector<T>(selector);
     if (element) return element;
 
     return new Promise((resolve) => {
       const startTime = Date.now();
       const observer = new MutationObserver(() => {
-        const element = document.querySelector(selector);
+        const element = document.querySelector<T>(selector);
         if (element || Date.now() - startTime > timeout) {
           observer.disconnect();
           resolve(element);
@@ -639,25 +639,6 @@ export const watchFeature = (() => {
     }
   };
 
-  // ===== Player Functions =====
-  const waitForPlayer = async (): Promise<YouTubePlayer> => {
-    if (player) return player;
-
-    return new Promise((resolve) => {
-      const interval = setInterval(() => {
-        player = document.getElementById(
-          "movie_player",
-        ) as unknown as YouTubePlayer;
-        if (player && typeof player.getPlayerState === "function") {
-          clearInterval(interval);
-          resolve(player);
-        }
-      }, 100);
-
-      setTimeout(() => clearInterval(interval), 5000);
-    });
-  };
-
   const waitForPlayerReady = async (player: YouTubePlayer): Promise<void> => {
     return new Promise((resolve) => {
       if (player.getPlayerState?.() !== undefined) {
@@ -730,7 +711,11 @@ export const watchFeature = (() => {
   };
 
   const handleVideo = async () => {
-    const player = await waitForPlayer();
+    const player = (await waitForElement<HTMLElement>(
+      "movie_player",
+    )) as unknown as YouTubePlayer;
+    if (!player) return;
+
     await waitForPlayerReady(player);
 
     await loopVideo(player);
