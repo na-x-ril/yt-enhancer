@@ -257,9 +257,9 @@ export const watchFeature = (() => {
     if (t === 0) return 0;
     if (t === 1) return 1;
     if (t < 0.5) {
-      return Math.pow(2, 34 * t - 10) / 2;
+      return Math.pow(2, 20 * t - 10) / 2;
     }
-    return (2 - Math.pow(2, -34 * t + 10)) / 2;
+    return (2 - Math.pow(2, -20 * t + 10)) / 2;
   };
 
   const parseViewCountData = (
@@ -348,9 +348,9 @@ export const watchFeature = (() => {
 
     const diff = Math.abs(toValue - fromValue);
     const base =
-      diff < 10 ? 400 : Math.min(1400, 500 + Math.log10(diff + 1) * 300);
+      diff < 10 ? 1200 : Math.min(3500, 1500 + Math.log10(diff + 1) * 800);
 
-    const duration = base + 200 * Math.min(1, Math.log10(diff + 1));
+    const duration = base + 500 * Math.min(1, Math.log10(diff + 1));
 
     const startTime = performance.now();
 
