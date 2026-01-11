@@ -572,18 +572,6 @@ export const watchFeature = (() => {
 
     const indicator = document.createElement("div");
     indicator.id = "yt-enhancer-dvr-indicator";
-    indicator.style.cssText = `
-      display: inline-flex;
-      align-items: center;
-      color: #fff;
-      font-size: inherit;
-      font-weight: 500;
-      font-family: Roboto, Arial, sans-serif;
-      white-space: nowrap;
-      margin-left: 8px;
-      vertical-align: middle;
-      line-height: 1;
-    `;
 
     const separator = document.createElement("span");
     separator.textContent = "•";

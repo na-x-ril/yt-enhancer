@@ -40,3 +40,16 @@
     background: rgba(255, 255, 255, 0.2);
   }
 }
+
+#yt-enhancer-dvr-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+  font-size: inherit;
+  font-weight: 500;
+  font-family: Roboto, Arial, sans-serif;
+  white-space: nowrap;
+  margin-left: 8px;
+  vertical-align: middle;
+  line-height: 1;
+}
