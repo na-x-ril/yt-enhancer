@@ -430,26 +430,9 @@ export const watchFeature = (() => {
 
     const infoWrapper = document.createElement("div");
     infoWrapper.id = "yt-enhancer-video-info";
-    infoWrapper.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 0.4rem;
-    `;
 
     const infoContainer = document.createElement("div");
-    infoContainer.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0.8rem 1.2rem;
-      font-size: 1.6rem;
-      color: var(--yt-spec-text-primary);
-      font-family: "Roboto", "Arial", sans-serif;
-      font-weight: 600;
-      background: rgba(255,255,255,.1);
-      border-radius: 2rem;
-    `;
+    infoContainer.id = "info-container";
 
     const viewCountSpan = document.createElement("span");
     viewCountSpan.id = "yt-enhancer-view-count";
@@ -472,25 +455,6 @@ export const watchFeature = (() => {
         <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"></path>
       </svg>
     `;
-    refreshButton.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.8rem;
-      background: rgba(255,255,255,.1);
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-      color: var(--yt-spec-text-primary);
-      transition: all 0.2s ease;
-      width: 40px;
-      height: 40px;
-    `;
-
-    refreshButton.onmouseenter = () =>
-      (refreshButton.style.background = "rgba(255,255,255,.2)");
-    refreshButton.onmouseleave = () =>
-      (refreshButton.style.background = "rgba(255,255,255,.1)");
 
     refreshButton.onclick = async () => {
       refreshButton.style.pointerEvents = "none";

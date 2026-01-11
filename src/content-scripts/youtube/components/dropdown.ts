@@ -7,212 +7,239 @@ interface DropdownConfig {
   autoCaption: boolean;
 }
 
+type ConfigKey = keyof DropdownConfig;
+
 const STORAGE_KEY = "dropdown_config";
+
+const DEFAULT_CONFIG: DropdownConfig = {
+  autoLoop: true,
+  qualityService: true,
+  autoCaption: true,
+};
+
+const TOGGLE_ITEMS: Array<{ id: ConfigKey; label: string }> = [
+  { id: "autoLoop", label: "Auto Loop" },
+  { id: "qualityService", label: "Quality Service" },
+  { id: "autoCaption", label: "Auto Caption" },
+];
 
 export class Dropdown {
   private container: HTMLElement | null = null;
   private button: HTMLElement | null = null;
   private menu: HTMLElement | null = null;
-  private config: DropdownConfig = {
-    autoLoop: true,
-    qualityService: true,
-    autoCaption: true,
-  };
+  private config: DropdownConfig = { ...DEFAULT_CONFIG };
   private isOpen = false;
+  private cleanupFns: Array<() => void> = [];
 
   async init() {
-    // Load config dari storage
-    const saved = await storageBridge.get(STORAGE_KEY);
-    if (saved) this.config = { ...this.config, ...saved };
-
+    await this.loadConfig();
     this.createUI();
     this.attachListeners();
   }
 
-  private createUI() {
-    // Container untuk button saja
-    this.container = document.createElement("div");
-    this.container.id = "yt-enhancer-dropdown";
-    this.container.style.cssText = `
-      position: relative;
-      display: inline-block;
-      margin-right: 1rem;
-    `;
-
-    // Button dengan SVG settings icon
-    this.button = document.createElement("button");
-    this.button.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; transition: transform 0.3s ease;">
-        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/>
-      </svg>
-    `;
-    this.button.style.cssText = `
-      background: rgba(255,255,255,.1);
-      border: none;
-      cursor: pointer;
-      padding: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      border-radius: 50%;
-    `;
-
-    // Dropdown menu (akan diletakkan di ytd-popup-container)
-    this.menu = document.createElement("div");
-    this.menu.id = "yt-enhancer-menu";
-    this.menu.style.cssText = `
-      display: none;
-      background: rgba(0,0,0,.8);
-      backdrop-filter: blur(8px);
-      border: 1px solid #343434;
-      position: fixed;
-      border-radius: 12px;
-      padding: 12px;
-      min-width: 220px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-      z-index: 9999;
-      top: 5.2rem;
-      right: 23rem;
-      user-select: none;
-    `;
-
-    this.menu.innerHTML = `
-      <div style="padding: 8px 12px; font-size: 20px; color: #fff; font-weight: 600; border-bottom: 1px solid #404040; margin-bottom: 12px;">
-        YT Enhancer Settings
-      </div>
-      ${this.createToggleItem("autoLoop", "Auto Loop", this.config.autoLoop)}
-      ${this.createToggleItem("qualityService", "Quality Service", this.config.qualityService)}
-      ${this.createToggleItem("autoCaption", "Auto Caption", this.config.autoCaption)}
-    `;
-
-    this.container.appendChild(this.button);
+  private async loadConfig() {
+    try {
+      const saved = await storageBridge.get(STORAGE_KEY);
+      if (saved) {
+        this.config = { ...DEFAULT_CONFIG, ...saved };
+      }
+    } catch (error) {
+      console.warn("Failed to load dropdown config:", error);
+    }
   }
 
-  private createToggleItem(
-    id: string,
-    label: string,
-    checked: boolean,
-  ): string {
-    return `
-      <div class="toggle-item" data-id="${id}" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; cursor: pointer; border-radius: 8px; transition: background 0.2s; margin-bottom: 4px;">
-        <span style="color: #fff; font-size: 16px;">${label}</span>
-        <div class="toggle-switch ${checked ? "active" : ""}" style="position: relative; width: 44px; height: 24px; background: ${checked ? "#3ea6ff" : "#717171"}; border-radius: 12px; transition: background 0.3s; flex-shrink: 0;">
-          <div class="toggle-knob" style="position: absolute; top: 2px; left: ${checked ? "22px" : "2px"}; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: left 0.3s;"></div>
-        </div>
-      </div>
-    `;
+  private createUI() {
+    this.createContainer();
+    this.createButton();
+    this.createMenu();
+  }
+
+  private createContainer() {
+    this.container = document.createElement("div");
+    this.container.id = "yt-enhancer-dropdown";
+  }
+
+  private createButton() {
+    this.button = document.createElement("button");
+    this.button.id = "yt-enhancer-dropdown-button";
+    this.button.setAttribute("aria-label", "YT Enhancer Settings");
+    this.button.setAttribute("aria-expanded", "false");
+    this.button.innerHTML = this.getSettingsIconSVG();
+
+    this.container?.appendChild(this.button);
+  }
+
+  private createMenu() {
+    this.menu = document.createElement("div");
+    this.menu.id = "yt-enhancer-menu";
+    this.menu.setAttribute("role", "menu");
+
+    const header = document.createElement("div");
+    header.id = "yt-enhancer-menu-header";
+    header.textContent = "YT Enhancer Settings";
+
+    this.menu.appendChild(header);
+
+    // Create toggle items
+    TOGGLE_ITEMS.forEach(({ id, label }) => {
+      this.menu?.appendChild(this.createToggleItem(id, label));
+    });
+  }
+
+  private createToggleItem(id: ConfigKey, label: string): HTMLElement {
+    const item = document.createElement("div");
+    item.className = "toggle-item";
+    item.setAttribute("data-id", id);
+    item.setAttribute("role", "menuitemcheckbox");
+    item.setAttribute("aria-checked", String(this.config[id]));
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "toggle-item-label";
+    labelSpan.textContent = label;
+
+    const toggleSwitch = this.createToggleSwitch(this.config[id]);
+
+    item.append(labelSpan, toggleSwitch);
+    return item;
+  }
+
+  private createToggleSwitch(isActive: boolean): HTMLElement {
+    const toggleSwitch = document.createElement("div");
+    toggleSwitch.className = `toggle-switch ${isActive ? "active" : ""}`;
+
+    const toggleKnob = document.createElement("div");
+    toggleKnob.className = "toggle-knob";
+
+    toggleSwitch.appendChild(toggleKnob);
+    return toggleSwitch;
   }
 
   private attachListeners() {
-    // Toggle dropdown dengan rotasi
-    this.button?.addEventListener("click", (e) => {
+    this.attachButtonListener();
+    this.attachMenuListener();
+    this.attachDocumentListeners();
+  }
+
+  private attachButtonListener() {
+    if (!this.button) return;
+
+    const handleClick = (e: Event) => {
       e.stopPropagation();
       this.toggleMenu();
-    });
+    };
 
-    // Close saat klik di luar
-    document.addEventListener("click", () => {
-      this.closeMenu();
-    });
+    this.button.addEventListener("click", handleClick);
+    this.cleanupFns.push(() =>
+      this.button?.removeEventListener("click", handleClick),
+    );
+  }
 
-    // Close saat escape
-    document.addEventListener("keydown", (e) => {
+  private attachMenuListener() {
+    if (!this.menu) return;
+
+    // Event delegation for toggle items
+    const handleMenuClick = (e: Event) => {
+      e.stopPropagation();
+
+      const target = e.target as HTMLElement;
+      const item = target.closest<HTMLElement>(".toggle-item");
+
+      if (item) {
+        this.handleToggle(item);
+      }
+    };
+
+    this.menu.addEventListener("click", handleMenuClick);
+    this.cleanupFns.push(() =>
+      this.menu?.removeEventListener("click", handleMenuClick),
+    );
+  }
+
+  private attachDocumentListeners() {
+    const handleDocumentClick = () => {
+      if (this.isOpen) this.closeMenu();
+    };
+
+    const handleKeydown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && this.isOpen) {
         this.closeMenu();
       }
+    };
+
+    document.addEventListener("click", handleDocumentClick);
+    document.addEventListener("keydown", handleKeydown);
+
+    this.cleanupFns.push(() => {
+      document.removeEventListener("click", handleDocumentClick);
+      document.removeEventListener("keydown", handleKeydown);
     });
+  }
 
-    this.menu?.addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
+  private handleToggle(item: HTMLElement) {
+    const id = item.getAttribute("data-id") as ConfigKey | null;
+    if (!id || !(id in this.config)) return;
 
-    // Toggle switch handlers
-    const toggleItems =
-      this.menu?.querySelectorAll<HTMLDivElement>(".toggle-item");
-    toggleItems?.forEach((item) => {
-      item.addEventListener("click", () => {
-        const id = item.getAttribute("data-id");
-        if (!id) return;
+    const toggleSwitch = item.querySelector<HTMLElement>(".toggle-switch");
+    if (!toggleSwitch) return;
 
-        const toggleSwitch =
-          item.querySelector<HTMLDivElement>(".toggle-switch");
-        const toggleKnob = item.querySelector<HTMLDivElement>(".toggle-knob");
+    const isActive = toggleSwitch.classList.contains("active");
+    const newValue = !isActive;
 
-        if (!toggleSwitch || !toggleKnob) return;
+    // Update UI
+    this.updateToggleUI(toggleSwitch, newValue);
+    item.setAttribute("aria-checked", String(newValue));
 
-        const isActive = toggleSwitch.classList.contains("active");
-        const newValue = !isActive;
+    // Update config
+    this.config[id] = newValue;
 
-        // Update UI
-        if (newValue) {
-          toggleSwitch.classList.add("active");
-          (toggleSwitch as HTMLElement).style.background = "#3ea6ff";
-          toggleKnob.style.left = "22px";
-        } else {
-          toggleSwitch.classList.remove("active");
-          (toggleSwitch as HTMLElement).style.background = "#717171";
-          toggleKnob.style.left = "2px";
-        }
+    // Persist and notify
+    this.saveConfig();
+    this.dispatchSettingChange(id, newValue);
+  }
 
-        // Update config
-        if (id === "autoLoop") {
-          this.config.autoLoop = newValue;
-        } else if (id === "qualityService") {
-          this.config.qualityService = newValue;
-        } else if (id === "autoCaption") {
-          this.config.autoCaption = newValue;
-        }
-
-        this.saveConfig();
-        this.dispatchEvent(id, newValue);
-      });
-
-      // Hover effect
-      item.addEventListener("mouseenter", () => {
-        (item as HTMLElement).style.background = "rgba(255,255,255,0.1)";
-      });
-      item.addEventListener("mouseleave", () => {
-        (item as HTMLElement).style.background = "transparent";
-      });
-    });
+  private updateToggleUI(toggleSwitch: HTMLElement, isActive: boolean) {
+    if (isActive) {
+      toggleSwitch.classList.add("active");
+    } else {
+      toggleSwitch.classList.remove("active");
+    }
   }
 
   private toggleMenu() {
-    const svg = this.button?.querySelector<SVGElement>("svg");
-
     if (this.isOpen) {
       this.closeMenu();
     } else {
-      this.menu!.style.display = "block";
-      this.isOpen = true;
-
-      // Rotate icon
-      if (svg) {
-        svg.style.transform = "rotate(45deg)";
-      }
+      this.openMenu();
     }
+  }
+
+  private openMenu() {
+    if (!this.menu || !this.button) return;
+
+    this.menu.classList.add("open");
+    this.button.classList.add("active");
+    this.button.setAttribute("aria-expanded", "true");
+    this.isOpen = true;
   }
 
   private closeMenu() {
-    const svg = this.button?.querySelector<SVGElement>("svg");
+    if (!this.menu || !this.button) return;
 
-    if (this.menu) {
-      this.menu.style.display = "none";
-      this.isOpen = false;
-
-      // Reset rotation
-      if (svg) {
-        svg.style.transform = "rotate(0deg)";
-      }
-    }
+    this.menu.classList.remove("open");
+    this.button.classList.remove("active");
+    this.button.setAttribute("aria-expanded", "false");
+    this.isOpen = false;
   }
 
   private async saveConfig() {
-    await storageBridge.set(STORAGE_KEY, this.config);
+    try {
+      await storageBridge.set(STORAGE_KEY, this.config);
+    } catch (error) {
+      console.warn("Failed to save dropdown config:", error);
+    }
   }
 
-  private dispatchEvent(setting: string, value: boolean) {
+  private dispatchSettingChange(setting: ConfigKey, value: boolean) {
     window.dispatchEvent(
       new CustomEvent("yt-enhancer-setting", {
         detail: { setting, value },
@@ -221,33 +248,71 @@ export class Dropdown {
   }
 
   inject() {
-    // Inject button ke #end
-    const targetButton = document.querySelector<HTMLDivElement>("#end");
-    if (targetButton && this.container) {
-      targetButton.insertAdjacentElement("afterbegin", this.container);
-    }
+    this.injectButton();
+    this.injectMenu();
+  }
 
-    // Inject menu ke ytd-popup-container
-    const waitForPopupContainer = setInterval(() => {
+  private injectButton() {
+    const target = document.querySelector<HTMLElement>("#end");
+    if (
+      target &&
+      this.container &&
+      !document.querySelector("#yt-enhancer-dropdown")
+    ) {
+      target.insertAdjacentElement("afterbegin", this.container);
+    }
+  }
+
+  private injectMenu() {
+    if (!this.menu || document.querySelector("#yt-enhancer-menu")) return;
+
+    // Use requestAnimationFrame for better performance
+    const waitForPopupContainer = () => {
       const popupContainer = document.querySelector<Element>(
         "ytd-popup-container.style-scope",
       );
-      if (popupContainer && this.menu) {
-        popupContainer.appendChild(this.menu);
-        clearInterval(waitForPopupContainer);
+
+      if (popupContainer) {
+        popupContainer.appendChild(this.menu!);
+      } else {
+        requestAnimationFrame(waitForPopupContainer);
       }
-    }, 100);
+    };
+
+    requestAnimationFrame(waitForPopupContainer);
   }
 
   destroy() {
+    // Run all cleanup functions
+    this.cleanupFns.forEach((fn) => {
+      try {
+        fn();
+      } catch (error) {
+        console.warn("Cleanup error:", error);
+      }
+    });
+    this.cleanupFns = [];
+
+    // Remove DOM elements
     this.container?.remove();
     this.menu?.remove();
+
+    // Clear references
     this.container = null;
     this.button = null;
     this.menu = null;
+    this.isOpen = false;
   }
 
-  getConfig() {
+  getConfig(): Readonly<DropdownConfig> {
     return { ...this.config };
+  }
+
+  private getSettingsIconSVG(): string {
+    return `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/>
+      </svg>
+    `;
   }
 }
