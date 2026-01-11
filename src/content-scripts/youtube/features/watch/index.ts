@@ -546,6 +546,61 @@ export const watchFeature = (() => {
     return content?.relativeDateText?.simpleText;
   };
 
+  const getIsLiveDVREnabled = (
+    initialPlayerResponse: InitialPlayerResponse,
+  ) => {
+    return initialPlayerResponse.videoDetails.isLiveDvrEnabled == true;
+  };
+
+  const displayLiveDVRIndicator = (isDVREnabled: boolean) => {
+    const existingIndicator = document.getElementById(
+      "yt-enhancer-dvr-indicator",
+    );
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+
+    if (!isLiveNow || isDVREnabled) return;
+
+    const timeWrapper = document.querySelector<HTMLElement>(
+      "div.ytp-time-wrapper",
+    );
+    if (!timeWrapper) {
+      console.warn("Time wrapper not found");
+      return;
+    }
+
+    const indicator = document.createElement("div");
+    indicator.id = "yt-enhancer-dvr-indicator";
+    indicator.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      color: #fff;
+      font-size: inherit;
+      font-weight: 500;
+      font-family: Roboto, Arial, sans-serif;
+      white-space: nowrap;
+      margin-left: 8px;
+      vertical-align: middle;
+      line-height: 1;
+    `;
+
+    const separator = document.createElement("span");
+    separator.textContent = "•";
+    separator.style.cssText = `
+      margin-right: 8px;
+      font-size: 1.6rem;
+    `;
+
+    const text = document.createElement("span");
+    text.textContent = "DVR disabled";
+
+    indicator.appendChild(separator);
+    indicator.appendChild(text);
+
+    timeWrapper.appendChild(indicator);
+  };
+
   const fetchAndLogVideoData = async (isUpdate: boolean = false) => {
     const data = await fetchVideoData(location.href);
 
@@ -576,6 +631,14 @@ export const watchFeature = (() => {
 
         if (viewCount && dateText) {
           displayVideoInfo(viewCount, dateText, isUpdate);
+        }
+
+        if (isLiveNow) {
+          const isDVREnabled = getIsLiveDVREnabled(ytInitialPlayerResponseObj);
+          console.log("Is Live DVR Enabled:", isDVREnabled);
+
+          await waitForElement("div.ytp-time-wrapper", 5000);
+          displayLiveDVRIndicator(isDVREnabled);
         }
       } catch (err) {
         console.warn("Failed to parse ytInitialData:", err);
@@ -743,6 +806,7 @@ export const watchFeature = (() => {
         cleanupIntercept();
 
         document.getElementById("yt-enhancer-video-info")?.remove();
+        document.getElementById("yt-enhancer-dvr-indicator")?.remove();
 
         videoId = null;
         ytInitialPlayerResponse = null;

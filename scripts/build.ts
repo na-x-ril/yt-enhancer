@@ -4,6 +4,7 @@ import { build } from "esbuild";
 import { $ } from "bun";
 
 const DIST = "dist";
+const ZIP = "yt-enhancer.zip";
 const SRC = "src";
 
 // ===== Utility Functions =====
@@ -53,14 +54,19 @@ const STATIC_ENTRIES = [
 const ESBUILD_COMMON_CONFIG = {
   bundle: true,
   minify: true,
-  sourcemap: false,
-  target: "es2020",
+  minifyIdentifiers: true,
+  minifySyntax: true,
+  minifyWhitespace: true,
+  treeShaking: true,
+  legalComments: "none",
+  target: "es2022",
 } as const;
 
 // ===== Build Steps =====
-async function cleanDist() {
-  console.log("🧹 Cleaning dist directory...");
+async function cleanOutputDirectory() {
+  console.log("🧹 Cleaning output directory...");
   await rm(DIST, { recursive: true, force: true });
+  await rm(ZIP, { recursive: true, force: true });
   await ensureDir(DIST);
 }
 
@@ -101,6 +107,20 @@ async function buildInjectedBridge(siteDir: string, outputDir: string) {
 
   console.log("  ✓ injected-bridge.js (ISOLATED world)");
   return true;
+}
+
+async function buildBackground() {
+  console.log("\n⚙️ Building background...");
+
+  await build({
+    ...ESBUILD_COMMON_CONFIG,
+    entryPoints: [join(SRC, "background", "index.ts")],
+    outfile: join(DIST, "background", "index.js"),
+    format: "esm",
+    platform: "browser",
+  });
+
+  console.log("  ✓ background/index.js");
 }
 
 async function buildMainScript(siteDir: string, outputDir: string) {
@@ -210,8 +230,9 @@ async function main() {
   const startTime = performance.now();
 
   try {
-    await cleanDist();
+    await cleanOutputDirectory();
     await copyStaticFiles();
+    await buildBackground();
     await buildAllSites();
     await createZipArchive();
 

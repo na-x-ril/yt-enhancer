@@ -38,6 +38,16 @@ export const waitForElement = async <T extends Element>(
   });
 };
 
+// Method-method yang harus ready sebelum player bisa digunakan
+const REQUIRED_METHODS = [
+  "getPlayerState",
+  "getCurrentTime",
+  "setPlaybackQualityRange",
+  "setLoopVideo",
+  "toggleSubtitlesOn",
+  "addEventListener",
+];
+
 export const waitForPlayer = async (): Promise<YouTubePlayer> => {
   const element = (await waitForElement<HTMLElement>(
     "#movie_player",
@@ -49,7 +59,11 @@ export const waitForPlayer = async (): Promise<YouTubePlayer> => {
 
   return new Promise((resolve) => {
     const checkReady = setInterval(() => {
-      if (typeof element!.getPlayerState === "function") {
+      const allMethodsReady = REQUIRED_METHODS.every(
+        (method) => typeof (element as any)[method] === "function",
+      );
+
+      if (allMethodsReady) {
         clearInterval(checkReady);
         resolve(element!);
       }
@@ -58,6 +72,6 @@ export const waitForPlayer = async (): Promise<YouTubePlayer> => {
     setTimeout(() => {
       clearInterval(checkReady);
       resolve(element!);
-    }, 3000);
+    }, 5000);
   });
 };
