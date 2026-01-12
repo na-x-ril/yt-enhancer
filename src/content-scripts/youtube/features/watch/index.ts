@@ -189,6 +189,8 @@ export const watchFeature = (() => {
             );
 
             if (viewCountElement) {
+              console.log("Auto-updating view count:", newViewCount);
+
               animateViewCountWithSuffix(
                 viewCountElement,
                 currentViewCount,
@@ -247,8 +249,8 @@ export const watchFeature = (() => {
       useEasing: true,
       smartEasingThreshold: 999,
       smartEasingAmount: 333,
-      separator: viewCountData.useComma ? "." : ",",
-      decimal: viewCountData.useComma ? "," : ".",
+      separator: ",",
+      decimal: ".",
       suffix: suffix,
 
       easingFn: (t: number, b: number, c: number, d: number): number => {
