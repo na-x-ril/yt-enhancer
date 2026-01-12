@@ -29,16 +29,19 @@ export const watchFeature = (() => {
   let qualityReferenceKey = "quality_reference";
   let isLiveNow: boolean = false;
 
+  // Config state
   let autoLoopEnabled = true;
   let autoCaptionEnabled = true;
   let qualityServiceEnabled = true;
   let qualityChangeListener: ((q: string) => void) | null = null;
   let isCaptionActive = false;
 
+  // Animation state
   let currentViewCount = 0;
   let currentDateText = "";
   let animationFrameId: number | null = null;
 
+  // time tracking
   let lastSavedTime = 0;
   let cleanupTimeTracking: (() => void) | null = null;
 
@@ -55,6 +58,7 @@ export const watchFeature = (() => {
       ) {
         await storageBridge.set(`video_time_${videoId}`, currentTime);
         lastSavedTime = currentTime;
+        console.log(`Saved time: ${currentTime}s for video ${videoId}`);
       }
     } catch (err) {
       console.warn("Failed to save current time:", err);
@@ -68,6 +72,7 @@ export const watchFeature = (() => {
       const savedTime = await storageBridge.get(`video_time_${videoId}`);
       if (savedTime && savedTime > 0) {
         player.seekTo(savedTime, true);
+        console.log(`Restored time: ${savedTime}s for video ${videoId}`);
       }
     } catch (err) {
       console.warn("Failed to restore time:", err);
@@ -89,6 +94,7 @@ export const watchFeature = (() => {
     };
   };
 
+  // ===== Network Intercept Functions =====
   const setupNetworkIntercept = () => {
     const originalFetch = window.fetch;
 
@@ -101,6 +107,7 @@ export const watchFeature = (() => {
         const [input] = args;
         const response = await Reflect.apply(target, thisArg, args);
 
+        // Check if this is an updated metadata request
         const url =
           typeof input === "string"
             ? input
@@ -139,6 +146,7 @@ export const watchFeature = (() => {
     let newDateText: string | undefined;
 
     for (const action of actions) {
+      // Extract view count
       if ("updateViewershipAction" in action) {
         const viewCountData =
           action.updateViewershipAction?.viewCount?.videoViewCountRenderer
@@ -153,6 +161,7 @@ export const watchFeature = (() => {
         }
       }
 
+      // Extract date text
       if ("updateDateTextAction" in action) {
         const dateTextData = action.updateDateTextAction?.dateText;
 
@@ -166,6 +175,7 @@ export const watchFeature = (() => {
       }
     }
 
+    // Update display if we have new data
     if (newViewCount || newDateText) {
       const existingInfo = document.getElementById("yt-enhancer-video-info");
       if (existingInfo) {
@@ -193,6 +203,7 @@ export const watchFeature = (() => {
             "yt-enhancer-date-text",
           );
           if (dateTextElement) {
+            console.log("Auto-updating date text:", newDateText);
             dateTextElement.textContent = newDateText;
             currentDateText = newDateText;
           }
@@ -348,6 +359,7 @@ export const watchFeature = (() => {
     const existingInfo = document.getElementById("yt-enhancer-video-info");
     const viewCountElement = document.getElementById("yt-enhancer-view-count");
 
+    // Update existing element
     if (isUpdate && existingInfo && viewCountElement) {
       animateViewCountWithSuffix(viewCountElement, currentViewCount, viewCount);
 
