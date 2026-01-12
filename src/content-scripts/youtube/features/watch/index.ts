@@ -639,8 +639,10 @@ export const watchFeature = (() => {
     await qualityService(player);
     await autoCaption(player);
 
-    cleanupTimeTracking = setupTimeTracking(player);
-    await restoreLastTime();
+    if (isLiveNow) {
+      cleanupTimeTracking = setupTimeTracking(player);
+      await restoreLastTime();
+    }
   };
 
   const settingListener = (event: Event) => {
