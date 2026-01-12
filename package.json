@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@types/webextension-polyfill": "^0.12.4",
+    "countup.js": "^2.9.0",
     "webextension-polyfill": "^0.12.0"
   }
 }

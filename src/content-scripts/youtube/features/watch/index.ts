@@ -19,30 +19,26 @@ import {
   waitForElement,
   waitForPlayer,
 } from "../../utils";
+import { CountUp } from "countup.js";
 
 export const watchFeature = (() => {
   let videoId: string | null = null;
-  let ytInitialPlayerResponse: string | null = null;
-  let ytInitialData: string | null = null;
   let videoState: number | null = null;
   let player: YouTubePlayer | null = null;
   let quality: string | null;
   let qualityReferenceKey = "quality_reference";
   let isLiveNow: boolean = false;
 
-  // Config state
   let autoLoopEnabled = true;
   let autoCaptionEnabled = true;
   let qualityServiceEnabled = true;
   let qualityChangeListener: ((q: string) => void) | null = null;
   let isCaptionActive = false;
 
-  // Animation state
   let currentViewCount = 0;
   let currentDateText = "";
   let animationFrameId: number | null = null;
 
-  // time tracking
   let lastSavedTime = 0;
   let cleanupTimeTracking: (() => void) | null = null;
 
@@ -59,7 +55,6 @@ export const watchFeature = (() => {
       ) {
         await storageBridge.set(`video_time_${videoId}`, currentTime);
         lastSavedTime = currentTime;
-        console.log(`Saved time: ${currentTime}s for video ${videoId}`);
       }
     } catch (err) {
       console.warn("Failed to save current time:", err);
@@ -73,7 +68,6 @@ export const watchFeature = (() => {
       const savedTime = await storageBridge.get(`video_time_${videoId}`);
       if (savedTime && savedTime > 0) {
         player.seekTo(savedTime, true);
-        console.log(`Restored time: ${savedTime}s for video ${videoId}`);
       }
     } catch (err) {
       console.warn("Failed to restore time:", err);
@@ -81,51 +75,20 @@ export const watchFeature = (() => {
   };
 
   const setupTimeTracking = (player: YouTubePlayer) => {
-    // 1. Save saat video di-pause
-    const onPause = () => {
-      saveCurrentTime();
-    };
-
-    // // 2. Save saat video playing (setiap timeupdate)
-    // const onTimeUpdate = () => {
-    //   const currentTime = player.getCurrentTime();
-    //   // Simpan setiap 5 detik perubahan
-    //   if (Math.abs(currentTime - lastSavedTime) >= 5) {
-    //     saveCurrentTime();
-    //   }
-    // };
-
-    // // 3. Save saat user seek
-    // const onSeek = () => {
-    //   saveCurrentTime();
-    // };
-
-    // 4. Save saat state berubah
+    const onPause = () => saveCurrentTime();
     const onStateChange = (state: number) => {
-      // State: 0 (ended), 1 (playing), 2 (paused)
-      if (state === 2 || state === 0) {
-        saveCurrentTime();
-      }
+      if (state === 2 || state === 0) saveCurrentTime();
     };
 
     player.addEventListener("onPause", onPause);
     player.addEventListener("onStateChange", onStateChange);
 
-    // // Gunakan VideoProgress untuk tracking waktu
-    // const progressListener = () => {
-    //   onTimeUpdate();
-    // };
-    // player.addEventListener("onVideoProgress", progressListener);
-
-    // Cleanup function
     return () => {
       player.removeEventListener("onPause", onPause);
       player.removeEventListener("onStateChange", onStateChange);
-      // player.removeEventListener("onVideoProgress", progressListener);
     };
   };
 
-  // ===== Network Intercept Functions =====
   const setupNetworkIntercept = () => {
     const originalFetch = window.fetch;
 
@@ -135,10 +98,9 @@ export const watchFeature = (() => {
         thisArg,
         args: [RequestInfo | URL, RequestInit?],
       ) => {
-        const [input, init] = args;
+        const [input] = args;
         const response = await Reflect.apply(target, thisArg, args);
 
-        // Check if this is an updated metadata request
         const url =
           typeof input === "string"
             ? input
@@ -177,7 +139,6 @@ export const watchFeature = (() => {
     let newDateText: string | undefined;
 
     for (const action of actions) {
-      // Extract view count
       if ("updateViewershipAction" in action) {
         const viewCountData =
           action.updateViewershipAction?.viewCount?.videoViewCountRenderer
@@ -192,7 +153,6 @@ export const watchFeature = (() => {
         }
       }
 
-      // Extract date text
       if ("updateDateTextAction" in action) {
         const dateTextData = action.updateDateTextAction?.dateText;
 
@@ -206,32 +166,25 @@ export const watchFeature = (() => {
       }
     }
 
-    // Update display if we have new data
     if (newViewCount || newDateText) {
       const existingInfo = document.getElementById("yt-enhancer-video-info");
       if (existingInfo) {
         if (newViewCount) {
-          const viewCountData = parseViewCountData(newViewCount);
-          const viewCountElement = document.getElementById(
-            "yt-enhancer-view-count",
-          );
+          const newViewCountData = parseViewCountData(newViewCount);
+          const newCount = newViewCountData.count;
 
-          if (
-            viewCountElement &&
-            viewCountData.count !== currentViewCount &&
-            currentViewCount > 0
-          ) {
-            console.log("Auto-updating view count:", newViewCount);
-            animateViewCount(
-              viewCountElement,
-              currentViewCount,
-              viewCountData.count,
-              viewCountData.formatted,
-              viewCountData.useComma,
+          if (newCount !== currentViewCount && currentViewCount > 0) {
+            const viewCountElement = document.getElementById(
+              "yt-enhancer-view-count",
             );
-          } else if (viewCountElement) {
-            viewCountElement.textContent = viewCountData.formatted;
-            currentViewCount = viewCountData.count;
+
+            if (viewCountElement) {
+              animateViewCountWithSuffix(
+                viewCountElement,
+                currentViewCount,
+                newViewCount,
+              );
+            }
           }
         }
 
@@ -240,17 +193,110 @@ export const watchFeature = (() => {
             "yt-enhancer-date-text",
           );
           if (dateTextElement) {
-            console.log("Auto-updating date text:", newDateText);
             dateTextElement.textContent = newDateText;
+            currentDateText = newDateText;
           }
         }
       }
     }
   };
 
-  // ===== Animation Functions =====
-  const lerp = (start: number, end: number, t: number): number => {
-    return start + (end - start) * t;
+  const animateViewCountWithSuffix = (
+    element: HTMLElement,
+    fromValue: number,
+    newViewCountString: string,
+  ) => {
+    const viewCountData = parseViewCountData(newViewCountString);
+    const toValue = viewCountData.count;
+
+    if (toValue === fromValue || fromValue === 0) {
+      element.textContent = newViewCountString;
+      currentViewCount = toValue;
+      return;
+    }
+
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+
+    const { suffix, divisor, decimalPlaces } =
+      extractNumberAndSuffix(newViewCountString);
+
+    const diff = Math.abs(toValue - fromValue);
+    const base =
+      diff < 10 ? 1.2 : Math.min(3.5, 1.5 + Math.log10(diff + 1) * 0.8);
+    const duration = base + 0.7 * Math.min(1, Math.log10(diff + 1));
+
+    const options = {
+      startVal: fromValue / divisor,
+      decimalPlaces: decimalPlaces,
+      duration: duration,
+      useGrouping: true,
+      useEasing: true,
+      smartEasingThreshold: 999,
+      smartEasingAmount: 333,
+      separator: viewCountData.useComma ? "." : ",",
+      decimal: viewCountData.useComma ? "," : ".",
+      suffix: suffix,
+
+      easingFn: (t: number, b: number, c: number, d: number): number => {
+        const progress = t / d;
+        const eased = easeInOutExpo(progress);
+        return b + c * eased;
+      },
+
+      onCompleteCallback: () => {
+        currentViewCount = toValue;
+        animationFrameId = null;
+      },
+    };
+
+    const countUp = new CountUp(element, toValue / divisor, options);
+
+    if (!countUp.error) {
+      countUp.start();
+      animationFrameId = 1;
+    } else {
+      console.error("CountUp error:", countUp.error);
+      element.textContent = newViewCountString;
+      currentViewCount = toValue;
+    }
+  };
+
+  const extractNumberAndSuffix = (
+    viewCountString: string,
+  ): {
+    suffix: string;
+    divisor: number;
+    decimalPlaces: number;
+  } => {
+    if (!viewCountString) {
+      return { suffix: "", divisor: 1, decimalPlaces: 0 };
+    }
+
+    const lowerStr = viewCountString.toLowerCase();
+    let divisor = 1;
+    let decimalPlaces = 0;
+
+    if (lowerStr.includes("k")) {
+      divisor = 1000;
+      decimalPlaces = 1;
+    } else if (lowerStr.includes("m")) {
+      divisor = 1000000;
+      decimalPlaces = 1;
+    } else if (lowerStr.includes("jt")) {
+      divisor = 1000000;
+      decimalPlaces = 1;
+    } else if (lowerStr.includes("b") || lowerStr.includes("miliar")) {
+      divisor = 1000000000;
+      decimalPlaces = 1;
+    }
+
+    const suffixMatch = viewCountString.match(/^[\d.,\s]+(.*)$/);
+    const suffix = ` ${suffixMatch && suffixMatch[1] ? suffixMatch[1].trim() : ""}`;
+
+    return { suffix, divisor, decimalPlaces };
   };
 
   const easeInOutExpo = (t: number): number => {
@@ -273,7 +319,6 @@ export const watchFeature = (() => {
     const useComma =
       viewCountStr.includes(",") && !viewCountStr.match(/\d+\.\d+[KMB]/i);
 
-    // Untuk parsing, ganti koma dengan titik jika ada, lalu hapus semua non-digit kecuali titik
     const normalized = viewCountStr.replace(/,/g, useComma ? "" : ".");
     const cleaned = normalized.replace(/[^\d.]/g, "");
 
@@ -292,97 +337,6 @@ export const watchFeature = (() => {
     };
   };
 
-  const formatViewCount = (
-    currentNum: number,
-    originalFormat: string,
-    useComma: boolean,
-  ): string => {
-    const suffixMatch = originalFormat.match(/[\d.,\s]+(.*)/);
-    const suffix = suffixMatch ? suffixMatch[1]?.trim() : "";
-    const lowerOriginal = originalFormat.toLowerCase();
-
-    if (lowerOriginal.includes("k")) {
-      const value = (currentNum / 1000).toFixed(1);
-      const formattedValue = useComma ? value.replace(".", ",") : value;
-      return `${formattedValue}K${suffix ? " " + suffix : ""}`;
-    } else if (lowerOriginal.includes("m")) {
-      const value = (currentNum / 1000000).toFixed(1);
-      const formattedValue = useComma ? value.replace(".", ",") : value;
-      return `${formattedValue}M${suffix ? " " + suffix : ""}`;
-    } else if (lowerOriginal.includes("jt")) {
-      const value = (currentNum / 1000000).toFixed(1);
-      const formattedValue = useComma ? value.replace(".", ",") : value;
-      return `${formattedValue} jt${suffix ? " " + suffix : ""}`;
-    } else if (
-      lowerOriginal.includes("b") ||
-      lowerOriginal.includes("miliar")
-    ) {
-      const value = (currentNum / 1000000000).toFixed(1);
-      const formattedValue = useComma ? value.replace(".", ",") : value;
-      return `${formattedValue}B${suffix ? " " + suffix : ""}`;
-    }
-
-    // Format full number
-    let formattedNumber: string;
-    if (useComma) {
-      // Format dengan koma: 4,055 (gunakan en-US lalu ganti titik dengan koma)
-      formattedNumber = currentNum.toLocaleString("en-US").replace(/\./g, ",");
-    } else {
-      // Format dengan titik: 4.055 (gunakan de-DE atau manual)
-      formattedNumber = currentNum.toLocaleString("de-DE");
-    }
-
-    return `${formattedNumber}${suffix ? " " + suffix : ""}`;
-  };
-
-  const animateViewCount = (
-    element: HTMLElement,
-    fromValue: number,
-    toValue: number,
-    originalFormat: string,
-    useComma: boolean,
-  ) => {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-    }
-
-    const diff = Math.abs(toValue - fromValue);
-    const base =
-      diff < 10 ? 1200 : Math.min(3500, 1500 + Math.log10(diff + 1) * 800);
-
-    const duration = base + 500 * Math.min(1, Math.log10(diff + 1));
-
-    const startTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = easeInOutExpo(progress);
-      const currentValue = Math.round(lerp(fromValue, toValue, eased));
-
-      element.textContent = formatViewCount(
-        currentValue,
-        originalFormat,
-        useComma,
-      );
-
-      if (progress < 1) {
-        animationFrameId = requestAnimationFrame(animate);
-      } else {
-        element.textContent = formatViewCount(
-          toValue,
-          originalFormat,
-          useComma,
-        );
-        currentViewCount = toValue;
-        animationFrameId = null;
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(animate);
-  };
-
-  // ===== Display Functions =====
   const displayVideoInfo = async (
     viewCount: string,
     dateText: string,
@@ -394,20 +348,8 @@ export const watchFeature = (() => {
     const existingInfo = document.getElementById("yt-enhancer-video-info");
     const viewCountElement = document.getElementById("yt-enhancer-view-count");
 
-    // Update existing element
     if (isUpdate && existingInfo && viewCountElement) {
-      if (newViewCount !== currentViewCount && currentViewCount > 0) {
-        animateViewCount(
-          viewCountElement,
-          currentViewCount,
-          newViewCount,
-          viewCountData.formatted,
-          viewCountData.useComma,
-        );
-      } else {
-        viewCountElement.textContent = viewCountData.formatted;
-        currentViewCount = newViewCount;
-      }
+      animateViewCountWithSuffix(viewCountElement, currentViewCount, viewCount);
 
       const dateTextElement = document.getElementById("yt-enhancer-date-text");
       if (dateTextElement) {
@@ -417,7 +359,6 @@ export const watchFeature = (() => {
       return;
     }
 
-    // Create new element
     if (existingInfo) existingInfo.remove();
     currentViewCount = newViewCount;
     currentDateText = dateText;
@@ -436,7 +377,7 @@ export const watchFeature = (() => {
 
     const viewCountSpan = document.createElement("span");
     viewCountSpan.id = "yt-enhancer-view-count";
-    viewCountSpan.textContent = viewCountData.formatted;
+    viewCountSpan.textContent = viewCount;
     viewCountSpan.style.fontVariantNumeric = "tabular-nums";
 
     const separator = document.createElement("span");
@@ -479,15 +420,14 @@ export const watchFeature = (() => {
     titleElement.insertAdjacentElement("afterend", infoWrapper);
   };
 
-  // ===== YouTube Data Functions =====
   const parseYTData = (html: string) => {
     const initialDataMatch = html.match(/var ytInitialData\s*=\s*(\{.*?\});/);
     const initialPlayerResponseMatch = html.match(
       /var ytInitialPlayerResponse\s*=\s*(\{.*?\});/,
     );
 
-    ytInitialData = initialDataMatch?.[1] ?? null;
-    ytInitialPlayerResponse = initialPlayerResponseMatch?.[1] ?? null;
+    const ytInitialData = initialDataMatch?.[1] ?? null;
+    const ytInitialPlayerResponse = initialPlayerResponseMatch?.[1] ?? null;
 
     return { ytInitialData, ytInitialPlayerResponse };
   };
@@ -504,14 +444,14 @@ export const watchFeature = (() => {
     const liveDetails = microformat?.liveBroadcastDetails;
 
     if (liveDetails?.isLiveNow === true) {
-      videoState = 3; // live now
+      videoState = 3;
       isLiveNow = true;
     } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
-      videoState = 2; // was live
+      videoState = 2;
     } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
-      videoState = 4; // upcoming
+      videoState = 4;
     } else {
-      videoState = 1; // not live
+      videoState = 1;
     }
   };
 
@@ -556,9 +496,7 @@ export const watchFeature = (() => {
     const existingIndicator = document.getElementById(
       "yt-enhancer-dvr-indicator",
     );
-    if (existingIndicator) {
-      existingIndicator.remove();
-    }
+    if (existingIndicator) existingIndicator.remove();
 
     if (!isLiveNow || isDVREnabled) return;
 
@@ -610,21 +548,12 @@ export const watchFeature = (() => {
           ytInitialPlayerResponseObj,
         );
 
-        console.log(
-          "Video Title:",
-          ytInitialPlayerResponseObj.videoDetails.title,
-        );
-        console.log("View Count:", viewCount);
-        console.log("Date Text:", dateText);
-
         if (viewCount && dateText) {
           displayVideoInfo(viewCount, dateText, isUpdate);
         }
 
         if (isLiveNow) {
           const isDVREnabled = getIsLiveDVREnabled(ytInitialPlayerResponseObj);
-          console.log("Is Live DVR Enabled:", isDVREnabled);
-
           await waitForElement("div.ytp-time-wrapper", 5000);
           displayLiveDVRIndicator(isDVREnabled);
         }
@@ -658,7 +587,6 @@ export const watchFeature = (() => {
 
     if (qualityServiceEnabled) {
       qualityChangeListener = (q: string) => {
-        console.log("Quality Changed:", q);
         if (q !== quality) {
           quality = q;
           storageBridge.set(qualityReferenceKey, q);
@@ -701,7 +629,6 @@ export const watchFeature = (() => {
     await restoreLastTime();
   };
 
-  // ===== Event Listeners =====
   const settingListener = (event: Event) => {
     const { setting, value } = (event as CustomEvent).detail;
 
@@ -738,13 +665,11 @@ export const watchFeature = (() => {
     }
   };
 
-  // ===== Module Interface =====
   return {
     match: (path: string) => path === "/watch",
 
     init: async () => {
       videoId = getVideoId();
-      console.log("videoId:", videoId);
       await initConfig();
 
       const cleanupIntercept = setupNetworkIntercept();
@@ -753,15 +678,11 @@ export const watchFeature = (() => {
       window.addEventListener("yt-enhancer-setting", settingListener);
       handleVideo();
 
-      const handleBeforeUnload = () => {
-        saveCurrentTime();
-      };
+      const handleBeforeUnload = () => saveCurrentTime();
       window.addEventListener("beforeunload", handleBeforeUnload);
 
       const handleVisibilityChange = () => {
-        if (document.hidden) {
-          saveCurrentTime();
-        }
+        if (document.hidden) saveCurrentTime();
       };
       document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -772,7 +693,6 @@ export const watchFeature = (() => {
           "visibilitychange",
           handleVisibilityChange,
         );
-
         window.removeEventListener("yt-enhancer-setting", settingListener);
 
         if (player && qualityChangeListener) {
@@ -797,8 +717,6 @@ export const watchFeature = (() => {
         document.getElementById("yt-enhancer-dvr-indicator")?.remove();
 
         videoId = null;
-        ytInitialPlayerResponse = null;
-        ytInitialData = null;
         videoState = null;
         player = null;
         quality = null;
@@ -809,8 +727,6 @@ export const watchFeature = (() => {
         currentDateText = "";
         animationFrameId = null;
         lastSavedTime = 0;
-
-        console.log("watch feature destroyed");
       };
     },
 
