@@ -627,7 +627,7 @@ export const watchFeature = (() => {
           displayLiveDVRIndicator(isDVREnabled);
         }
 
-        if (player && !isLiveNow) {
+        if (player && !isLiveNow && !isUpdate) {
           cleanupTimeTracking = setupTimeTracking(player);
           await restoreLastTime();
         }
