@@ -254,8 +254,8 @@ export const watchFeature = (() => {
     // Hitung durasi dinamis
     const diff = Math.abs(toValue - fromValue);
     const base =
-      diff < 10 ? 1.2 : Math.min(3.5, 1.5 + Math.log10(diff + 1) * 0.8);
-    const duration = base + 0.7 * Math.min(1, Math.log10(diff + 1));
+      diff < 10 ? 0.8 : Math.min(2.5, 1.0 + Math.log10(diff + 1) * 0.6);
+    const duration = base + 0.4 * Math.min(1, Math.log10(diff + 1));
 
     // Konfigurasi CountUp
     const options = {
@@ -269,12 +269,6 @@ export const watchFeature = (() => {
       separator: ",",
       decimal: ".",
       suffix: suffix,
-
-      easingFn: (t: number, b: number, c: number, d: number): number => {
-        const progress = t / d;
-        const eased = easeInOutExpo(progress);
-        return b + c * eased;
-      },
 
       onCompleteCallback: () => {
         currentViewCount = toValue;
