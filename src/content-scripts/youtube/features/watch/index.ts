@@ -46,7 +46,7 @@ export const watchFeature = (() => {
   let cleanupTimeTracking: (() => void) | null = null;
 
   const saveCurrentTime = async () => {
-    if (!player || !videoId) return;
+    if (!player || !videoId || isLiveNow) return;
 
     try {
       const currentTime = player.getCurrentTime();
@@ -80,14 +80,22 @@ export const watchFeature = (() => {
   };
 
   const setupTimeTracking = (player: YouTubePlayer) => {
-    const onPause = () => saveCurrentTime();
+    if (isLiveNow) return null;
+
+    const onPause = () => {
+      saveCurrentTime();
+    };
+
     const onStateChange = (state: number) => {
-      if (state === 2 || state === 0) saveCurrentTime();
+      if (state === 2 || state === 0) {
+        saveCurrentTime();
+      }
     };
 
     player.addEventListener("onPause", onPause);
     player.addEventListener("onStateChange", onStateChange);
 
+    // Cleanup function
     return () => {
       player.removeEventListener("onPause", onPause);
       player.removeEventListener("onStateChange", onStateChange);
@@ -180,9 +188,11 @@ export const watchFeature = (() => {
       const existingInfo = document.getElementById("yt-enhancer-video-info");
       if (existingInfo) {
         if (newViewCount) {
+          // Parse view count baru untuk perbandingan
           const newViewCountData = parseViewCountData(newViewCount);
           const newCount = newViewCountData.count;
 
+          // Skip jika tidak ada perubahan
           if (newCount !== currentViewCount && currentViewCount > 0) {
             const viewCountElement = document.getElementById(
               "yt-enhancer-view-count",
@@ -190,13 +200,14 @@ export const watchFeature = (() => {
 
             if (viewCountElement) {
               console.log("Auto-updating view count:", newViewCount);
-
               animateViewCountWithSuffix(
                 viewCountElement,
                 currentViewCount,
                 newViewCount,
               );
             }
+          } else {
+            console.log("View count unchanged, skipping animation");
           }
         }
 
@@ -217,30 +228,36 @@ export const watchFeature = (() => {
   const animateViewCountWithSuffix = (
     element: HTMLElement,
     fromValue: number,
-    newViewCountString: string,
+    newViewCountString: string, // e.g., "4.5K views" atau "1,234 views"
   ) => {
+    // Parse data dari string
     const viewCountData = parseViewCountData(newViewCountString);
     const toValue = viewCountData.count;
 
+    // Skip jika tidak ada perubahan
     if (toValue === fromValue || fromValue === 0) {
       element.textContent = newViewCountString;
       currentViewCount = toValue;
       return;
     }
 
+    // Cancel animasi sebelumnya jika ada
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
 
+    // Extract number dan suffix dari original string
     const { suffix, divisor, decimalPlaces } =
       extractNumberAndSuffix(newViewCountString);
 
+    // Hitung durasi dinamis
     const diff = Math.abs(toValue - fromValue);
     const base =
       diff < 10 ? 1.2 : Math.min(3.5, 1.5 + Math.log10(diff + 1) * 0.8);
     const duration = base + 0.7 * Math.min(1, Math.log10(diff + 1));
 
+    // Konfigurasi CountUp
     const options = {
       startVal: fromValue / divisor,
       decimalPlaces: decimalPlaces,
@@ -265,6 +282,7 @@ export const watchFeature = (() => {
       },
     };
 
+    // Inisialisasi dan start CountUp
     const countUp = new CountUp(element, toValue / divisor, options);
 
     if (!countUp.error) {
@@ -280,18 +298,20 @@ export const watchFeature = (() => {
   const extractNumberAndSuffix = (
     viewCountString: string,
   ): {
+    number: number;
     suffix: string;
     divisor: number;
     decimalPlaces: number;
   } => {
     if (!viewCountString) {
-      return { suffix: "", divisor: 1, decimalPlaces: 0 };
+      return { number: 0, suffix: "", divisor: 1, decimalPlaces: 0 };
     }
 
     const lowerStr = viewCountString.toLowerCase();
     let divisor = 1;
     let decimalPlaces = 0;
 
+    // Deteksi multiplier
     if (lowerStr.includes("k")) {
       divisor = 1000;
       decimalPlaces = 1;
@@ -309,7 +329,28 @@ export const watchFeature = (() => {
     const suffixMatch = viewCountString.match(/^[\d.,\s]+(.*)$/);
     const suffix = ` ${suffixMatch && suffixMatch[1] ? suffixMatch[1].trim() : ""}`;
 
-    return { suffix, divisor, decimalPlaces };
+    // Extract number untuk CountUp
+    const useComma =
+      viewCountString.includes(",") && !viewCountString.match(/\d+\.\d+[KMB]/i);
+    const normalized = viewCountString.replace(/,/g, useComma ? "" : ".");
+    const cleaned = normalized.replace(/[^\d.]/g, "");
+
+    let multiplier = 1;
+    if (lowerStr.includes("k")) multiplier = 1000;
+    else if (lowerStr.includes("m") || lowerStr.includes("jt"))
+      multiplier = 1000000;
+    else if (lowerStr.includes("b") || lowerStr.includes("miliar"))
+      multiplier = 1000000000;
+
+    const num = parseFloat(cleaned);
+    const number = isNaN(num) ? 0 : num * multiplier;
+
+    return {
+      number,
+      suffix,
+      divisor,
+      decimalPlaces,
+    };
   };
 
   const easeInOutExpo = (t: number): number => {
@@ -350,6 +391,7 @@ export const watchFeature = (() => {
     };
   };
 
+  // ===== Display Functions =====
   const displayVideoInfo = async (
     viewCount: string,
     dateText: string,
@@ -373,6 +415,7 @@ export const watchFeature = (() => {
       return;
     }
 
+    // Create new element
     if (existingInfo) existingInfo.remove();
     currentViewCount = newViewCount;
     currentDateText = dateText;
@@ -391,7 +434,7 @@ export const watchFeature = (() => {
 
     const viewCountSpan = document.createElement("span");
     viewCountSpan.id = "yt-enhancer-view-count";
-    viewCountSpan.textContent = viewCount;
+    viewCountSpan.textContent = viewCount; // Display original format dengan suffix
     viewCountSpan.style.fontVariantNumeric = "tabular-nums";
 
     const separator = document.createElement("span");
@@ -434,6 +477,7 @@ export const watchFeature = (() => {
     titleElement.insertAdjacentElement("afterend", infoWrapper);
   };
 
+  // ===== YouTube Data Functions =====
   const parseYTData = (html: string) => {
     const initialDataMatch = html.match(/var ytInitialData\s*=\s*(\{.*?\});/);
     const initialPlayerResponseMatch = html.match(
@@ -458,14 +502,14 @@ export const watchFeature = (() => {
     const liveDetails = microformat?.liveBroadcastDetails;
 
     if (liveDetails?.isLiveNow === true) {
-      videoState = 3;
+      videoState = 3; // live now
       isLiveNow = true;
     } else if (liveDetails?.isLiveNow === false && !videoDetails.isUpcoming) {
-      videoState = 2;
+      videoState = 2; // was live
     } else if (liveDetails?.isLiveNow === false && videoDetails.isUpcoming) {
-      videoState = 4;
+      videoState = 4; // upcoming
     } else {
-      videoState = 1;
+      videoState = 1; // not live
     }
   };
 
@@ -510,7 +554,9 @@ export const watchFeature = (() => {
     const existingIndicator = document.getElementById(
       "yt-enhancer-dvr-indicator",
     );
-    if (existingIndicator) existingIndicator.remove();
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
 
     if (!isLiveNow || isDVREnabled) return;
 
@@ -562,14 +608,28 @@ export const watchFeature = (() => {
           ytInitialPlayerResponseObj,
         );
 
+        console.log(
+          "Video Title:",
+          ytInitialPlayerResponseObj.videoDetails.title,
+        );
+        console.log("View Count:", viewCount);
+        console.log("Date Text:", dateText);
+
         if (viewCount && dateText) {
           displayVideoInfo(viewCount, dateText, isUpdate);
         }
 
         if (isLiveNow) {
           const isDVREnabled = getIsLiveDVREnabled(ytInitialPlayerResponseObj);
+          console.log("Is Live DVR Enabled:", isDVREnabled);
+
           await waitForElement("div.ytp-time-wrapper", 5000);
           displayLiveDVRIndicator(isDVREnabled);
+        }
+
+        if (player && !isLiveNow && !isUpdate) {
+          cleanupTimeTracking = setupTimeTracking(player);
+          await restoreLastTime();
         }
       } catch (err) {
         console.warn("Failed to parse ytInitialData:", err);
@@ -601,6 +661,7 @@ export const watchFeature = (() => {
 
     if (qualityServiceEnabled) {
       qualityChangeListener = (q: string) => {
+        console.log("Quality Changed:", q);
         if (q !== quality) {
           quality = q;
           storageBridge.set(qualityReferenceKey, q);
@@ -638,13 +699,9 @@ export const watchFeature = (() => {
     await loopVideo(player);
     await qualityService(player);
     await autoCaption(player);
-
-    if (isLiveNow) {
-      cleanupTimeTracking = setupTimeTracking(player);
-      await restoreLastTime();
-    }
   };
 
+  // ===== Event Listeners =====
   const settingListener = (event: Event) => {
     const { setting, value } = (event as CustomEvent).detail;
 
@@ -681,11 +738,13 @@ export const watchFeature = (() => {
     }
   };
 
+  // ===== Module Interface =====
   return {
     match: (path: string) => path === "/watch",
 
     init: async () => {
       videoId = getVideoId();
+      console.log("videoId:", videoId);
       await initConfig();
 
       const cleanupIntercept = setupNetworkIntercept();
@@ -694,11 +753,15 @@ export const watchFeature = (() => {
       window.addEventListener("yt-enhancer-setting", settingListener);
       handleVideo();
 
-      const handleBeforeUnload = () => saveCurrentTime();
+      const handleBeforeUnload = () => {
+        saveCurrentTime();
+      };
       window.addEventListener("beforeunload", handleBeforeUnload);
 
       const handleVisibilityChange = () => {
-        if (document.hidden) saveCurrentTime();
+        if (document.hidden) {
+          saveCurrentTime();
+        }
       };
       document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -709,6 +772,7 @@ export const watchFeature = (() => {
           "visibilitychange",
           handleVisibilityChange,
         );
+
         window.removeEventListener("yt-enhancer-setting", settingListener);
 
         if (player && qualityChangeListener) {
@@ -743,6 +807,8 @@ export const watchFeature = (() => {
         currentDateText = "";
         animationFrameId = null;
         lastSavedTime = 0;
+
+        console.log("watch feature destroyed");
       };
     },
 
