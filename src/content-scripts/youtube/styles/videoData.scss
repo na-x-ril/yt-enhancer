@@ -53,3 +53,14 @@
   vertical-align: middle;
   line-height: 1;
 }
+
+#viewcount-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#yt-enhancer-view-count,
+#yt-enhancer-view-suffix {
+  display: inline-block;
+}
