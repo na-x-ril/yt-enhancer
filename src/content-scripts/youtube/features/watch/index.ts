@@ -206,6 +206,24 @@ export const watchFeature = (() => {
                 currentViewCount,
                 newViewCount,
               );
+            } else if (currentViewCount === 0) {
+              // First update, set without animation
+              const viewCountElement = document.getElementById(
+                "yt-enhancer-view-count",
+              );
+              const suffixElement = document.getElementById(
+                "yt-enhancer-view-suffix",
+              );
+
+              if (viewCountElement && suffixElement) {
+                const { suffix, divisor, decimalPlaces } =
+                  extractNumberAndSuffix(newViewCount);
+                viewCountElement.textContent = (newCount / divisor)
+                  .toFixed(decimalPlaces)
+                  .replace(/\.0$/, "");
+                suffixElement.textContent = suffix;
+                currentViewCount = newCount;
+              }
             }
           }
         }
@@ -235,7 +253,20 @@ export const watchFeature = (() => {
 
     // Skip jika tidak ada perubahan
     if (toValue === fromValue || fromValue === 0) {
-      element.textContent = newViewCountString;
+      const { suffix, divisor, decimalPlaces } =
+        extractNumberAndSuffix(newViewCountString);
+
+      // Update number element saja
+      element.textContent = (toValue / divisor)
+        .toFixed(decimalPlaces)
+        .replace(/\.0$/, "");
+
+      // Update suffix element terpisah
+      const suffixElement = document.getElementById("yt-enhancer-view-suffix");
+      if (suffixElement) {
+        suffixElement.textContent = suffix;
+      }
+
       currentViewCount = toValue;
       return;
     }
@@ -328,8 +359,11 @@ export const watchFeature = (() => {
       decimalPlaces = 1;
     }
 
-    const suffixMatch = viewCountString.match(/^[\d.,\s]+(.*)$/);
-    const suffix = ` ${suffixMatch && suffixMatch[1] ? suffixMatch[1].trim() : ""}`;
+    // Extract suffix dengan lebih akurat
+    const numberMatch = viewCountString.match(/^[\d.,\s]+/);
+    const numberPart = numberMatch ? numberMatch[0] : "";
+    const suffixPart = viewCountString.slice(numberPart.length).trim();
+    const suffix = suffixPart ? ` ${suffixPart}` : "";
 
     // Extract number untuk CountUp
     const useComma =
@@ -407,12 +441,20 @@ export const watchFeature = (() => {
 
     // Update existing element
     if (isUpdate && existingInfo && viewCountElement) {
-      animateViewCountWithSuffix(viewCountElement, currentViewCount, viewCount);
+      if (newViewCount !== currentViewCount) {
+        animateViewCountWithSuffix(
+          viewCountElement,
+          currentViewCount,
+          viewCount,
+        );
+      }
 
       const dateTextElement = document.getElementById("yt-enhancer-date-text");
       if (dateTextElement) {
-        dateTextElement.textContent = dateText;
-        currentDateText = dateText;
+        if (dateText !== currentDateText) {
+          dateTextElement.textContent = dateText;
+          currentDateText = dateText;
+        }
       }
       return;
     }
