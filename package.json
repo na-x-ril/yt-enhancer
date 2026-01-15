@@ -18,6 +18,7 @@
   "dependencies": {
     "@types/webextension-polyfill": "^0.12.4",
     "countup.js": "^2.9.0",
+    "odometer_countup": "^1.0.4",
     "webextension-polyfill": "^0.12.0"
   }
 }

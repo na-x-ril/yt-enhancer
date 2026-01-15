@@ -20,6 +20,7 @@ import {
   waitForPlayer,
 } from "../../utils";
 import { CountUp } from "countup.js";
+import { Odometer } from "odometer_countup";
 
 export const watchFeature = (() => {
   let videoId: string | null = null;
@@ -39,7 +40,7 @@ export const watchFeature = (() => {
   // Animation state
   let currentViewCount = 0;
   let currentDateText = "";
-  let animationFrameId: number | null = null;
+  let countUpInstance: CountUp | null = null;
 
   // time tracking
   let lastSavedTime = 0;
@@ -206,8 +207,6 @@ export const watchFeature = (() => {
                 newViewCount,
               );
             }
-          } else {
-            console.log("View count unchanged, skipping animation");
           }
         }
 
@@ -241,10 +240,10 @@ export const watchFeature = (() => {
       return;
     }
 
-    // Cancel animasi sebelumnya jika ada
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
+    // Destroy instance sebelumnya jika ada
+    if (countUpInstance) {
+      countUpInstance.reset();
+      countUpInstance = null;
     }
 
     // Extract number dan suffix dari original string
@@ -257,6 +256,11 @@ export const watchFeature = (() => {
       diff < 10 ? 0.8 : Math.min(2.5, 1.0 + Math.log10(diff + 1) * 0.6);
     const duration = base + 0.4 * Math.min(1, Math.log10(diff + 1));
 
+    const suffixElement = document.getElementById("yt-enhancer-view-suffix");
+    if (suffixElement) {
+      suffixElement.textContent = suffix;
+    }
+
     // Konfigurasi CountUp
     const options = {
       startVal: fromValue / divisor,
@@ -268,24 +272,28 @@ export const watchFeature = (() => {
       smartEasingAmount: 333,
       separator: ",",
       decimal: ".",
-      suffix: suffix,
+      plugin: new Odometer({
+        duration: duration * 0.6,
+        lastDigitDelay: 0,
+      }),
 
       onCompleteCallback: () => {
         currentViewCount = toValue;
-        animationFrameId = null;
+        countUpInstance = null;
       },
     };
 
     // Inisialisasi dan start CountUp
-    const countUp = new CountUp(element, toValue / divisor, options);
+    countUpInstance = new CountUp(element, toValue / divisor, options);
 
-    if (!countUp.error) {
-      countUp.start();
-      animationFrameId = 1;
+    if (!countUpInstance.error) {
+      countUpInstance.start();
     } else {
-      console.error("CountUp error:", countUp.error);
-      element.textContent = newViewCountString;
+      console.error("CountUp error:", countUpInstance.error);
+      element.textContent = (toValue / divisor).toLocaleString();
+      if (suffixElement) suffixElement.textContent = suffix;
       currentViewCount = toValue;
+      countUpInstance = null;
     }
   };
 
@@ -420,16 +428,27 @@ export const watchFeature = (() => {
       return;
     }
 
+    const { suffix, divisor } = extractNumberAndSuffix(viewCount);
+
     const infoWrapper = document.createElement("div");
     infoWrapper.id = "yt-enhancer-video-info";
 
     const infoContainer = document.createElement("div");
     infoContainer.id = "info-container";
 
+    const viewCountContainer = document.createElement("span");
+    viewCountContainer.id = "viewcount-container";
+
     const viewCountSpan = document.createElement("span");
     viewCountSpan.id = "yt-enhancer-view-count";
-    viewCountSpan.textContent = viewCount; // Display original format dengan suffix
+    viewCountSpan.textContent = (newViewCount / divisor).toLocaleString();
     viewCountSpan.style.fontVariantNumeric = "tabular-nums";
+
+    const suffixSpan = document.createElement("span");
+    suffixSpan.id = "yt-enhancer-view-suffix";
+    suffixSpan.textContent = suffix;
+
+    viewCountContainer.append(viewCountSpan, suffixSpan);
 
     const separator = document.createElement("span");
     separator.textContent = "•";
@@ -438,7 +457,7 @@ export const watchFeature = (() => {
     dateTextSpan.id = "yt-enhancer-date-text";
     dateTextSpan.textContent = dateText;
 
-    infoContainer.append(viewCountSpan, separator, dateTextSpan);
+    infoContainer.append(viewCountContainer, separator, dateTextSpan);
 
     const refreshButton = document.createElement("button");
     refreshButton.id = "yt-enhancer-refresh-btn";
@@ -781,8 +800,9 @@ export const watchFeature = (() => {
           cleanupTimeTracking = null;
         }
 
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
+        if (countUpInstance) {
+          countUpInstance.reset();
+          countUpInstance = null;
         }
 
         cleanupIntercept();
@@ -799,7 +819,6 @@ export const watchFeature = (() => {
         isCaptionActive = false;
         currentViewCount = 0;
         currentDateText = "";
-        animationFrameId = null;
         lastSavedTime = 0;
 
         console.log("watch feature destroyed");
