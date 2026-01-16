@@ -705,6 +705,25 @@ export const watchFeature = (() => {
     await loopVideo(player);
     if (quality) await qualityService(player, quality);
     await autoCaption(player);
+    monitorPlayerState(player);
+  };
+
+  const monitorPlayerState = (player: YouTubePlayer) => {
+    const onStateChange = (state: number) => {
+      console.log("Player state changed:", state);
+      // -1: unstarted,
+      // 0: ended,
+      // 1: playing,
+      // 2: paused,
+      // 3: buffering,
+      // 5: cued
+    };
+
+    player.addEventListener("onStateChange", onStateChange);
+
+    return () => {
+      player.removeEventListener("onStateChange", onStateChange);
+    };
   };
 
   // ===== Event Listeners =====

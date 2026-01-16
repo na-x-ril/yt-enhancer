@@ -59,13 +59,22 @@ export const waitForPlayer = async (): Promise<YouTubePlayer> => {
 
   return new Promise((resolve) => {
     const checkReady = setInterval(() => {
-      const allMethodsReady = REQUIRED_METHODS.every(
-        (method) => typeof (element as any)[method] === "function",
-      );
+      const allMethodsReady = REQUIRED_METHODS.every((method) => {
+        const hasMethod = typeof (element as any)[method] === "function";
+        if (!hasMethod) {
+          console.debug(`Waiting for method: ${method}`);
+        }
+        return hasMethod;
+      });
 
-      if (allMethodsReady) {
+      const playerState = element.getPlayerState();
+      const isUsableState = playerState !== undefined;
+
+      if (allMethodsReady && isUsableState) {
         clearInterval(checkReady);
-        resolve(element!);
+        console.log("Player is ready");
+        resolve(element);
+        return;
       }
     }, 100);
 
