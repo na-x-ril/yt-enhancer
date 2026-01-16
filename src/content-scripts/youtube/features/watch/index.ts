@@ -27,14 +27,12 @@ export const watchFeature = (() => {
   let videoState: number | null = null;
   let player: YouTubePlayer | null = null;
   let quality: string | null;
-  let qualityReferenceKey = "quality_reference";
   let isLiveNow: boolean = false;
 
   // Config state
   let autoLoopEnabled = true;
   let autoCaptionEnabled = true;
   let qualityServiceEnabled = true;
-  let qualityChangeListener: ((q: string) => void) | null = null;
   let isCaptionActive = false;
 
   // Animation state
