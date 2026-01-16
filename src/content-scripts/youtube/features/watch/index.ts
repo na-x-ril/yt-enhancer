@@ -305,7 +305,7 @@ export const watchFeature = (() => {
       decimal: ".",
       plugin: new Odometer({
         duration: duration * 0.6,
-        lastDigitDelay: 0,
+        lastDigitDelay: 0.1,
       }),
 
       onCompleteCallback: () => {
