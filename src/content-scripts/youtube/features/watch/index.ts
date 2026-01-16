@@ -252,9 +252,10 @@ export const watchFeature = (() => {
       const { suffix, divisor, decimalPlaces } =
         extractNumberAndSuffix(newViewCountString);
 
-      element.textContent = (toValue / divisor)
+      const formatted = (toValue / divisor)
         .toFixed(decimalPlaces)
-        .replace(/\.0$/, "");
+        .replace(/\.0+$/, "");
+      element.textContent = formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
       const suffixElement = document.getElementById("yt-enhancer-view-suffix");
       if (suffixElement) {
@@ -285,7 +286,7 @@ export const watchFeature = (() => {
 
     const options = {
       startVal: fromValue / divisor,
-      decimalPlaces: decimalPlaces,
+      decimalPlaces: 0,
       duration: duration,
       useGrouping: true,
       useEasing: true,
@@ -409,7 +410,6 @@ export const watchFeature = (() => {
     const existingInfo = document.getElementById("yt-enhancer-video-info");
     const viewCountElement = document.getElementById("yt-enhancer-view-count");
 
-    // Update existing element
     if (isUpdate && existingInfo && viewCountElement) {
       if (newViewCount !== currentViewCount) {
         animateViewCountWithSuffix(
@@ -429,7 +429,6 @@ export const watchFeature = (() => {
       return;
     }
 
-    // Create new element
     if (existingInfo) existingInfo.remove();
     currentViewCount = newViewCount;
     currentDateText = dateText;
@@ -440,7 +439,8 @@ export const watchFeature = (() => {
       return;
     }
 
-    const { suffix, divisor } = extractNumberAndSuffix(viewCount);
+    const { suffix, divisor, decimalPlaces } =
+      extractNumberAndSuffix(viewCount);
 
     const infoWrapper = document.createElement("div");
     infoWrapper.id = "yt-enhancer-video-info";
@@ -453,7 +453,11 @@ export const watchFeature = (() => {
 
     const viewCountSpan = document.createElement("span");
     viewCountSpan.id = "yt-enhancer-view-count";
-    viewCountSpan.textContent = (newViewCount / divisor).toLocaleString();
+
+    const formatted = (newViewCount / divisor)
+      .toFixed(decimalPlaces)
+      .replace(/\.0+$/, "");
+    viewCountSpan.textContent = formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     viewCountSpan.style.fontVariantNumeric = "tabular-nums";
 
     const suffixSpan = document.createElement("span");
@@ -818,7 +822,6 @@ export const watchFeature = (() => {
         videoState = null;
         player = null;
         quality = null;
-        qualityChangeListener = null;
         isLiveNow = false;
         isCaptionActive = false;
         currentViewCount = 0;
