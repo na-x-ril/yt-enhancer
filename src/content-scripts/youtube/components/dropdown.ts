@@ -5,9 +5,10 @@ interface DropdownConfig {
   autoLoop: boolean;
   qualityService: boolean;
   autoCaption: boolean;
+  preferredQuality: string;
 }
 
-type ConfigKey = keyof DropdownConfig;
+type ToggleKey = "autoLoop" | "qualityService" | "autoCaption";
 
 const STORAGE_KEY = "dropdown_config";
 
@@ -15,12 +16,24 @@ const DEFAULT_CONFIG: DropdownConfig = {
   autoLoop: true,
   qualityService: true,
   autoCaption: true,
+  preferredQuality: "hd1080",
 };
 
-const TOGGLE_ITEMS: Array<{ id: ConfigKey; label: string }> = [
+const TOGGLE_ITEMS: Array<{ id: ToggleKey; label: string }> = [
   { id: "autoLoop", label: "Auto Loop" },
   { id: "qualityService", label: "Quality Service" },
   { id: "autoCaption", label: "Auto Caption" },
+];
+
+const QUALITY_OPTIONS = [
+  { value: "highres", label: "2160p", description: "4K" },
+  { value: "hd1440", label: "1440p", description: "2K" },
+  { value: "hd1080", label: "1080p", description: "Full HD" },
+  { value: "hd720", label: "720p", description: "HD" },
+  { value: "large", label: "480p", description: "SD" },
+  { value: "medium", label: "360p", description: "" },
+  { value: "small", label: "240p", description: "" },
+  { value: "tiny", label: "144p", description: "" },
 ];
 
 export class Dropdown {
@@ -84,9 +97,12 @@ export class Dropdown {
     TOGGLE_ITEMS.forEach(({ id, label }) => {
       this.menu?.appendChild(this.createToggleItem(id, label));
     });
+
+    // Create quality selector
+    this.menu?.appendChild(this.createQualitySelector());
   }
 
-  private createToggleItem(id: ConfigKey, label: string): HTMLElement {
+  private createToggleItem(id: ToggleKey, label: string): HTMLElement {
     const item = document.createElement("div");
     item.className = "toggle-item";
     item.setAttribute("data-id", id);
@@ -114,9 +130,60 @@ export class Dropdown {
     return toggleSwitch;
   }
 
+  private createQualitySelector(): HTMLElement {
+    const container = document.createElement("div");
+    container.className = "quality-selector-container";
+
+    const labelWrapper = document.createElement("div");
+    labelWrapper.className = "quality-selector-header";
+
+    const label = document.createElement("span");
+    label.className = "quality-selector-label";
+    label.textContent = "Preferred Quality";
+
+    const currentQuality = QUALITY_OPTIONS.find(
+      (opt) => opt.value === this.config.preferredQuality,
+    );
+    const badge = document.createElement("span");
+    badge.className = "quality-badge";
+    badge.id = "quality-badge";
+    badge.textContent = currentQuality?.label || "1080p";
+
+    labelWrapper.append(label, badge);
+
+    const selectWrapper = document.createElement("div");
+    selectWrapper.className = "quality-select-wrapper";
+
+    const select = document.createElement("select");
+    select.id = "quality-selector";
+    select.className = "quality-selector";
+    select.setAttribute("aria-label", "Select preferred video quality");
+
+    QUALITY_OPTIONS.forEach(({ value, label, description }) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = description ? `${label} (${description})` : label;
+      option.selected = value === this.config.preferredQuality;
+      select.appendChild(option);
+    });
+
+    const icon = document.createElement("span");
+    icon.className = "quality-select-icon";
+    icon.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+
+    selectWrapper.append(select, icon);
+    container.append(labelWrapper, selectWrapper);
+    return container;
+  }
+
   private attachListeners() {
     this.attachButtonListener();
     this.attachMenuListener();
+    this.attachQualityListener();
     this.attachDocumentListeners();
   }
 
@@ -137,7 +204,6 @@ export class Dropdown {
   private attachMenuListener() {
     if (!this.menu) return;
 
-    // Event delegation for toggle items
     const handleMenuClick = (e: Event) => {
       e.stopPropagation();
 
@@ -152,6 +218,35 @@ export class Dropdown {
     this.menu.addEventListener("click", handleMenuClick);
     this.cleanupFns.push(() =>
       this.menu?.removeEventListener("click", handleMenuClick),
+    );
+  }
+
+  private attachQualityListener() {
+    const select =
+      this.menu?.querySelector<HTMLSelectElement>("#quality-selector");
+    if (!select) return;
+
+    const handleChange = (e: Event) => {
+      const target = e.target as HTMLSelectElement;
+      const quality = target.value;
+
+      // Update badge
+      const badge = this.menu?.querySelector("#quality-badge");
+      const selectedOption = QUALITY_OPTIONS.find(
+        (opt) => opt.value === quality,
+      );
+      if (badge && selectedOption) {
+        badge.textContent = selectedOption.label;
+      }
+
+      this.config.preferredQuality = quality;
+      this.saveConfig();
+      this.dispatchQualityChange(quality);
+    };
+
+    select.addEventListener("change", handleChange);
+    this.cleanupFns.push(() =>
+      select?.removeEventListener("change", handleChange),
     );
   }
 
@@ -176,7 +271,7 @@ export class Dropdown {
   }
 
   private handleToggle(item: HTMLElement) {
-    const id = item.getAttribute("data-id") as ConfigKey | null;
+    const id = item.getAttribute("data-id") as ToggleKey | null;
     if (!id || !(id in this.config)) return;
 
     const toggleSwitch = item.querySelector<HTMLElement>(".toggle-switch");
@@ -185,14 +280,11 @@ export class Dropdown {
     const isActive = toggleSwitch.classList.contains("active");
     const newValue = !isActive;
 
-    // Update UI
     this.updateToggleUI(toggleSwitch, newValue);
     item.setAttribute("aria-checked", String(newValue));
 
-    // Update config
     this.config[id] = newValue;
 
-    // Persist and notify
     this.saveConfig();
     this.dispatchSettingChange(id, newValue);
   }
@@ -239,10 +331,18 @@ export class Dropdown {
     }
   }
 
-  private dispatchSettingChange(setting: ConfigKey, value: boolean) {
+  private dispatchSettingChange(setting: ToggleKey, value: boolean) {
     window.dispatchEvent(
       new CustomEvent("yt-enhancer-setting", {
         detail: { setting, value },
+      }),
+    );
+  }
+
+  private dispatchQualityChange(quality: string) {
+    window.dispatchEvent(
+      new CustomEvent("yt-enhancer-quality", {
+        detail: { quality },
       }),
     );
   }
@@ -266,7 +366,6 @@ export class Dropdown {
   private injectMenu() {
     if (!this.menu || document.querySelector("#yt-enhancer-menu")) return;
 
-    // Use requestAnimationFrame for better performance
     const waitForPopupContainer = () => {
       const popupContainer = document.querySelector<Element>(
         "ytd-popup-container.style-scope",
@@ -283,7 +382,6 @@ export class Dropdown {
   }
 
   destroy() {
-    // Run all cleanup functions
     this.cleanupFns.forEach((fn) => {
       try {
         fn();
@@ -293,11 +391,9 @@ export class Dropdown {
     });
     this.cleanupFns = [];
 
-    // Remove DOM elements
     this.container?.remove();
     this.menu?.remove();
 
-    // Clear references
     this.container = null;
     this.button = null;
     this.menu = null;
