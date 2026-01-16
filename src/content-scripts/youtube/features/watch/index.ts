@@ -245,23 +245,19 @@ export const watchFeature = (() => {
   const animateViewCountWithSuffix = (
     element: HTMLElement,
     fromValue: number,
-    newViewCountString: string, // e.g., "4.5K views" atau "1,234 views"
+    newViewCountString: string,
   ) => {
-    // Parse data dari string
     const viewCountData = parseViewCountData(newViewCountString);
     const toValue = viewCountData.count;
 
-    // Skip jika tidak ada perubahan
     if (toValue === fromValue || fromValue === 0) {
       const { suffix, divisor, decimalPlaces } =
         extractNumberAndSuffix(newViewCountString);
 
-      // Update number element saja
       element.textContent = (toValue / divisor)
         .toFixed(decimalPlaces)
         .replace(/\.0$/, "");
 
-      // Update suffix element terpisah
       const suffixElement = document.getElementById("yt-enhancer-view-suffix");
       if (suffixElement) {
         suffixElement.textContent = suffix;
@@ -271,17 +267,14 @@ export const watchFeature = (() => {
       return;
     }
 
-    // Destroy instance sebelumnya jika ada
     if (countUpInstance) {
       countUpInstance.reset();
       countUpInstance = null;
     }
 
-    // Extract number dan suffix dari original string
     const { suffix, divisor, decimalPlaces } =
       extractNumberAndSuffix(newViewCountString);
 
-    // Hitung durasi dinamis
     const diff = Math.abs(toValue - fromValue);
     const base =
       diff < 10 ? 0.8 : Math.min(2.5, 1.0 + Math.log10(diff + 1) * 0.6);
@@ -292,7 +285,6 @@ export const watchFeature = (() => {
       suffixElement.textContent = suffix;
     }
 
-    // Konfigurasi CountUp
     const options = {
       startVal: fromValue / divisor,
       decimalPlaces: decimalPlaces,
@@ -314,7 +306,6 @@ export const watchFeature = (() => {
       },
     };
 
-    // Inisialisasi dan start CountUp
     countUpInstance = new CountUp(element, toValue / divisor, options);
 
     if (!countUpInstance.error) {
@@ -326,6 +317,33 @@ export const watchFeature = (() => {
       currentViewCount = toValue;
       countUpInstance = null;
     }
+  };
+
+  const parseViewCountData = (
+    viewCountStr: string,
+  ): { count: number; formatted: string; useComma: boolean } => {
+    if (!viewCountStr) return { count: 0, formatted: "0", useComma: false };
+
+    const lowerStr = viewCountStr.toLowerCase();
+
+    const useComma = true;
+
+    const normalized = viewCountStr.replace(/\./g, "");
+    const cleaned = normalized.replace(/[^\d]/g, "");
+
+    let multiplier = 1;
+    if (lowerStr.includes("k") || lowerStr.includes("rb")) multiplier = 1000;
+    else if (lowerStr.includes("m") || lowerStr.includes("jt"))
+      multiplier = 1000000;
+    else if (lowerStr.includes("b") || lowerStr.includes("miliar"))
+      multiplier = 1000000000;
+
+    const num = parseFloat(cleaned);
+    return {
+      count: isNaN(num) ? 0 : Math.floor(num * multiplier),
+      formatted: viewCountStr,
+      useComma: useComma,
+    };
   };
 
   const extractNumberAndSuffix = (
@@ -344,14 +362,10 @@ export const watchFeature = (() => {
     let divisor = 1;
     let decimalPlaces = 0;
 
-    // Deteksi multiplier
-    if (lowerStr.includes("k")) {
+    if (lowerStr.includes("k") || lowerStr.includes("rb")) {
       divisor = 1000;
       decimalPlaces = 1;
-    } else if (lowerStr.includes("m")) {
-      divisor = 1000000;
-      decimalPlaces = 1;
-    } else if (lowerStr.includes("jt")) {
+    } else if (lowerStr.includes("m") || lowerStr.includes("jt")) {
       divisor = 1000000;
       decimalPlaces = 1;
     } else if (lowerStr.includes("b") || lowerStr.includes("miliar")) {
@@ -359,20 +373,16 @@ export const watchFeature = (() => {
       decimalPlaces = 1;
     }
 
-    // Extract suffix dengan lebih akurat
     const numberMatch = viewCountString.match(/^[\d.,\s]+/);
     const numberPart = numberMatch ? numberMatch[0] : "";
     const suffixPart = viewCountString.slice(numberPart.length).trim();
     const suffix = suffixPart ? ` ${suffixPart}` : "";
 
-    // Extract number untuk CountUp
-    const useComma =
-      viewCountString.includes(",") && !viewCountString.match(/\d+\.\d+[KMB]/i);
-    const normalized = viewCountString.replace(/,/g, useComma ? "" : ".");
-    const cleaned = normalized.replace(/[^\d.]/g, "");
+    const normalized = viewCountString.replace(/\./g, "");
+    const cleaned = normalized.replace(/[^\d]/g, "");
 
     let multiplier = 1;
-    if (lowerStr.includes("k")) multiplier = 1000;
+    if (lowerStr.includes("k") || lowerStr.includes("rb")) multiplier = 1000;
     else if (lowerStr.includes("m") || lowerStr.includes("jt"))
       multiplier = 1000000;
     else if (lowerStr.includes("b") || lowerStr.includes("miliar"))
@@ -386,35 +396,6 @@ export const watchFeature = (() => {
       suffix,
       divisor,
       decimalPlaces,
-    };
-  };
-
-  const parseViewCountData = (
-    viewCountStr: string,
-  ): { count: number; formatted: string; useComma: boolean } => {
-    if (!viewCountStr) return { count: 0, formatted: "0", useComma: false };
-
-    const formatted = viewCountStr;
-    const lowerStr = viewCountStr.toLowerCase();
-
-    const useComma =
-      viewCountStr.includes(",") && !viewCountStr.match(/\d+\.\d+[KMB]/i);
-
-    const normalized = viewCountStr.replace(/,/g, useComma ? "" : ".");
-    const cleaned = normalized.replace(/[^\d.]/g, "");
-
-    let multiplier = 1;
-    if (lowerStr.includes("k")) multiplier = 1000;
-    else if (lowerStr.includes("m") || lowerStr.includes("jt"))
-      multiplier = 1000000;
-    else if (lowerStr.includes("b") || lowerStr.includes("miliar"))
-      multiplier = 1000000000;
-
-    const num = parseFloat(cleaned);
-    return {
-      count: isNaN(num) ? 0 : Math.floor(num * multiplier),
-      formatted: formatted,
-      useComma: useComma,
     };
   };
 
@@ -660,6 +641,8 @@ export const watchFeature = (() => {
         );
         console.log("View Count:", viewCount);
         console.log("Date Text:", dateText);
+        console.log("Full InitialData:", ytInitialDataObj);
+        console.log("Full InitialPlayerResponse:", ytInitialPlayerResponseObj);
 
         if (viewCount && dateText) {
           displayVideoInfo(viewCount, dateText, isUpdate);
