@@ -2135,10 +2135,23 @@ export interface ViewCount {
 }
 
 export interface VideoViewCountRenderer {
-  viewCount: ViewsClass;
+  viewCount: {
+    simpleText?: string;
+    runs?: Array<{ text: string }>;
+  };
   isLive?: boolean;
-  originalViewCount: string;
-  shortViewCount?: LiveIndicatorText;
+  extraShortViewCount?: {
+    accessibility?: {
+      accessibilityData: {
+        label: string;
+      };
+    };
+    simpleText: string;
+  };
+  unlabeledViewCountValue?: {
+    simpleText: string;
+  };
+  originalViewCount?: string;
 }
 
 export interface VideoSecondaryInfoRenderer {

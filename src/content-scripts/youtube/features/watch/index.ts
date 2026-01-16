@@ -389,15 +389,6 @@ export const watchFeature = (() => {
     };
   };
 
-  const easeInOutExpo = (t: number): number => {
-    if (t === 0) return 0;
-    if (t === 1) return 1;
-    if (t < 0.5) {
-      return Math.pow(2, 20 * t - 10) / 2;
-    }
-    return (2 - Math.pow(2, -20 * t + 10)) / 2;
-  };
-
   const parseViewCountData = (
     viewCountStr: string,
   ): { count: number; formatted: string; useComma: boolean } => {
@@ -696,39 +687,15 @@ export const watchFeature = (() => {
     if (autoLoopEnabled) player.setLoopVideo(true);
   };
 
-  const setVideoResolution = async (player: YouTubePlayer) => {
+  const setVideoResolution = async (player: YouTubePlayer, quality: string) => {
     if (!qualityServiceEnabled) return;
 
-    quality = (await storageBridge.get(qualityReferenceKey)) || "hd1080";
-    await player.setPlaybackQualityRange(quality!);
-    await delay(1000);
+    await player.setPlaybackQualityRange(quality);
+    console.log("Quality set to:", quality);
   };
 
-  const watchVideoResolution = (player: YouTubePlayer) => {
-    if (!player) return;
-
-    if (qualityChangeListener) {
-      player.removeEventListener(
-        "onPlaybackQualityChange",
-        qualityChangeListener,
-      );
-    }
-
-    if (qualityServiceEnabled) {
-      qualityChangeListener = (q: string) => {
-        console.log("Quality Changed:", q);
-        if (q !== quality) {
-          quality = q;
-          storageBridge.set(qualityReferenceKey, q);
-        }
-      };
-      player.addEventListener("onPlaybackQualityChange", qualityChangeListener);
-    }
-  };
-
-  const qualityService = async (player: YouTubePlayer) => {
-    await setVideoResolution(player);
-    watchVideoResolution(player);
+  const qualityService = async (player: YouTubePlayer, quality: string) => {
+    await setVideoResolution(player, quality);
   };
 
   const autoCaption = async (player: YouTubePlayer) => {
@@ -744,6 +711,7 @@ export const watchFeature = (() => {
       autoLoopEnabled = config.autoLoop ?? true;
       qualityServiceEnabled = config.qualityService ?? true;
       autoCaptionEnabled = config.autoCaption ?? true;
+      quality = config.preferredQuality ?? "hd1080";
     }
   };
 
@@ -752,7 +720,7 @@ export const watchFeature = (() => {
     if (!player) return;
 
     await loopVideo(player);
-    await qualityService(player);
+    if (quality) await qualityService(player, quality);
     await autoCaption(player);
   };
 
@@ -764,19 +732,9 @@ export const watchFeature = (() => {
       autoLoopEnabled = value;
       if (player) player.setLoopVideo(value);
     } else if (setting === "qualityService") {
-      const wasEnabled = qualityServiceEnabled;
       qualityServiceEnabled = value;
-
-      if (player) {
-        if (value && !wasEnabled) {
-          qualityService(player);
-        } else if (!value && wasEnabled && qualityChangeListener) {
-          player.removeEventListener(
-            "onPlaybackQualityChange",
-            qualityChangeListener,
-          );
-          qualityChangeListener = null;
-        }
+      if (value && player && quality) {
+        setVideoResolution(player, quality);
       }
     } else if (setting === "autoCaption") {
       autoCaptionEnabled = value;
@@ -793,6 +751,16 @@ export const watchFeature = (() => {
     }
   };
 
+  const qualityListener = (event: Event) => {
+    const { quality: newQuality } = (event as CustomEvent).detail;
+
+    quality = newQuality;
+
+    if (player && qualityServiceEnabled) {
+      setVideoResolution(player, newQuality);
+    }
+  };
+
   // ===== Module Interface =====
   return {
     match: (path: string) => path === "/watch",
@@ -806,6 +774,7 @@ export const watchFeature = (() => {
 
       fetchAndLogVideoData();
       window.addEventListener("yt-enhancer-setting", settingListener);
+      window.addEventListener("yt-enhancer-quality", qualityListener);
       handleVideo();
 
       const handleBeforeUnload = () => {
@@ -823,19 +792,12 @@ export const watchFeature = (() => {
       return () => {
         saveCurrentTime();
         window.removeEventListener("beforeunload", handleBeforeUnload);
+        window.removeEventListener("yt-enhancer-setting", settingListener);
+        window.removeEventListener("yt-enhancer-quality", qualityListener);
         document.removeEventListener(
           "visibilitychange",
           handleVisibilityChange,
         );
-
-        window.removeEventListener("yt-enhancer-setting", settingListener);
-
-        if (player && qualityChangeListener) {
-          player.removeEventListener(
-            "onPlaybackQualityChange",
-            qualityChangeListener,
-          );
-        }
 
         if (cleanupTimeTracking) {
           cleanupTimeTracking();
