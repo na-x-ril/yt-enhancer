@@ -65,13 +65,13 @@ export const waitForPlayer = async (): Promise<YouTubePlayer> => {
 
       if (allMethodsReady) {
         clearInterval(checkReady);
-        resolve(element!);
+        resolve(element);
       }
     }, 100);
 
     setTimeout(() => {
       clearInterval(checkReady);
-      resolve(element!);
+      resolve(element);
     }, 5000);
   });
 };
