@@ -100,5 +100,19 @@ body {
     .ytPlayerOverlayVideoDetailsRendererSingleLineTitle.ytPlayerOverlayVideoDetailsRendererTitle {
       font-size: 2.4rem !important;
     }
+
+    video {
+      filter: saturate(1.5) !important;
+    }
+
+    #page-header-container.ytd-tabbed-page-header,
+    #tabs-container.ytd-tabbed-page-header {
+      background: $bg-transparent;
+
+      #page-header.ytd-tabbed-page-header,
+      #tabs-inner-container.ytd-tabbed-page-header {
+        background: $bg-semi-black-1;
+      }
+    }
   }
 }
