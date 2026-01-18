@@ -690,18 +690,6 @@ export const watchFeature = (() => {
         console.warn("Failed to toggle auto caption:", err);
       }
     },
-
-    monitor: (player: YouTubePlayer) => {
-      try {
-        const onStateChange = (s: number) =>
-          console.log("Player state changed:", s);
-        player.addEventListener("onStateChange", onStateChange);
-        return () => player.removeEventListener("onStateChange", onStateChange);
-      } catch (err) {
-        console.warn("Failed to monitor player state:", err);
-        return () => {};
-      }
-    },
   };
 
   const configManager = {
@@ -768,7 +756,6 @@ export const watchFeature = (() => {
       state.player = await waitForPlayer();
       if (!state.player) return;
 
-      playerFeatures.monitor(state.player);
       await playerFeatures.loop(state.player);
       await playerFeatures.caption(state.player);
       if (config.quality)
