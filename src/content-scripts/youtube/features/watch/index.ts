@@ -77,8 +77,20 @@ export const watchFeature = (() => {
 
       try {
         const currentTime = state.player.getCurrentTime();
+        const duration = state.player.getDuration();
+
+        if (!currentTime || !duration) return;
+
+        if (currentTime < 30 || duration - currentTime < 30) {
+          await storageBridge.remove(`video_time_${state.id}`);
+          state.lastSavedTime = 0;
+          console.log(
+            `Removed saved time for video ${state.id} (near start/end)`,
+          );
+          return;
+        }
+
         if (
-          currentTime &&
           currentTime > 0 &&
           Math.abs(currentTime - state.lastSavedTime) >= 3
         ) {
@@ -96,7 +108,17 @@ export const watchFeature = (() => {
 
       try {
         const savedTime = await storageBridge.get(`video_time_${state.id}`);
-        if (savedTime && savedTime > 0) {
+        const duration = state.player.getDuration();
+
+        if (!savedTime || !duration) return;
+
+        if (savedTime < 30 || duration - savedTime < 30) {
+          await storageBridge.remove(`video_time_${state.id}`);
+          console.log(`Removed invalid saved time for video ${state.id}`);
+          return;
+        }
+
+        if (savedTime > 0) {
           state.player.seekTo(savedTime, true);
           console.log(`Restored time: ${savedTime}s for video ${state.id}`);
         }
