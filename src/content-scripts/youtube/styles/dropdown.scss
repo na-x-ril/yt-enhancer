@@ -119,16 +119,6 @@ $separator-color: #404040;
     display: block;
   }
 
-  // Header
-  &-header {
-    padding: 8px 12px;
-    font-size: 20px;
-    color: $text-primary;
-    font-weight: 600;
-    border-bottom: 1px solid $separator-color;
-    margin-bottom: 12px;
-  }
-
   // Toggle Item
   .toggle-item {
     display: flex;
