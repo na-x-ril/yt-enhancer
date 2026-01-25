@@ -42,11 +42,32 @@ export const waitForElement = async <T extends Element>(
 const REQUIRED_METHODS = [
   "getPlayerState",
   "getCurrentTime",
+  "getDuration",
   "setPlaybackQualityRange",
   "setLoopVideo",
   "toggleSubtitlesOn",
+  "toggleSubtitles",
   "addEventListener",
+  "removeEventListener",
+  "seekTo",
 ];
+
+const isPlayerReady = (player: YouTubePlayer): boolean => {
+  try {
+    const allMethodsExist = REQUIRED_METHODS.every(
+      (method) => typeof (player as any)[method] === "function",
+    );
+
+    if (!allMethodsExist) return false;
+
+    const state = player.getPlayerState();
+    const duration = player.getDuration();
+
+    return typeof state === "number" && typeof duration === "number";
+  } catch {
+    return false;
+  }
+};
 
 export const waitForPlayer = async (): Promise<YouTubePlayer> => {
   const element = (await waitForElement<HTMLElement>(
@@ -57,21 +78,21 @@ export const waitForPlayer = async (): Promise<YouTubePlayer> => {
     throw new Error("Player element not found");
   }
 
-  return new Promise((resolve) => {
-    const checkReady = setInterval(() => {
-      const allMethodsReady = REQUIRED_METHODS.every(
-        (method) => typeof (element as any)[method] === "function",
-      );
+  return new Promise((resolve, reject) => {
+    const timeout = 10000;
+    const startTime = Date.now();
 
-      if (allMethodsReady) {
+    const checkReady = setInterval(() => {
+      if (Date.now() - startTime > timeout) {
+        clearInterval(checkReady);
+        reject(new Error("Player ready timeout"));
+        return;
+      }
+
+      if (isPlayerReady(element)) {
         clearInterval(checkReady);
         resolve(element);
       }
     }, 100);
-
-    setTimeout(() => {
-      clearInterval(checkReady);
-      resolve(element);
-    }, 5000);
   });
 };
