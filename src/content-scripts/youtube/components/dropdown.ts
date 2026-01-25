@@ -87,19 +87,54 @@ export class Dropdown {
     this.menu.id = "yt-enhancer-menu";
     this.menu.setAttribute("role", "menu");
 
-    const header = document.createElement("div");
-    header.id = "yt-enhancer-menu-header";
-    header.textContent = "YT Enhancer Settings";
-
+    const header = this.createHeader();
     this.menu.appendChild(header);
 
-    // Create toggle items
     TOGGLE_ITEMS.forEach(({ id, label }) => {
       this.menu?.appendChild(this.createToggleItem(id, label));
     });
 
-    // Create quality selector
     this.menu?.appendChild(this.createQualitySelector());
+  }
+
+  private createHeader(): HTMLElement {
+    const header = document.createElement("div");
+    header.id = "yt-enhancer-menu-header";
+
+    const title = document.createElement("span");
+    title.className = "header-title";
+    title.textContent = "YT Enhancer Settings";
+
+    const refreshButton = document.createElement("button");
+    refreshButton.className = "header-refresh";
+    refreshButton.setAttribute("aria-label", "Refresh player features");
+    refreshButton.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
+      </svg>
+    `;
+
+    refreshButton.onclick = async (e) => {
+      e.stopPropagation();
+
+      refreshButton.disabled = true;
+
+      const svg = refreshButton.querySelector<SVGElement>("svg");
+      if (svg) {
+        svg.style.transition = "transform 0.5s ease";
+        svg.style.transform = "rotate(360deg)";
+      }
+
+      window.dispatchEvent(new CustomEvent("yt-enhancer-refresh"));
+
+      setTimeout(() => {
+        refreshButton.disabled = false;
+        if (svg) svg.style.transform = "rotate(0deg)";
+      }, 500);
+    };
+
+    header.append(title, refreshButton);
+    return header;
   }
 
   private createToggleItem(id: ToggleKey, label: string): HTMLElement {
