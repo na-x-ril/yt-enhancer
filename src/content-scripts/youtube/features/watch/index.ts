@@ -77,8 +77,20 @@ export const watchFeature = (() => {
 
       try {
         const currentTime = state.player.getCurrentTime();
+        const duration = state.player.getDuration();
+
+        if (!currentTime || !duration) return;
+
+        if (currentTime < 30 || duration - currentTime < 30) {
+          await storageBridge.remove(`video_time_${state.id}`);
+          state.lastSavedTime = 0;
+          console.log(
+            `Removed saved time for video ${state.id} (near start/end)`,
+          );
+          return;
+        }
+
         if (
-          currentTime &&
           currentTime > 0 &&
           Math.abs(currentTime - state.lastSavedTime) >= 3
         ) {
@@ -96,7 +108,17 @@ export const watchFeature = (() => {
 
       try {
         const savedTime = await storageBridge.get(`video_time_${state.id}`);
-        if (savedTime && savedTime > 0) {
+        const duration = state.player.getDuration();
+
+        if (!savedTime || !duration) return;
+
+        if (savedTime < 30 || duration - savedTime < 30) {
+          await storageBridge.remove(`video_time_${state.id}`);
+          console.log(`Removed invalid saved time for video ${state.id}`);
+          return;
+        }
+
+        if (savedTime > 0) {
           state.player.seekTo(savedTime, true);
           console.log(`Restored time: ${savedTime}s for video ${state.id}`);
         }
@@ -662,6 +684,19 @@ export const watchFeature = (() => {
   };
 
   const playerFeatures = {
+    applyAll: async (player: YouTubePlayer) => {
+      try {
+        await playerFeatures.loop(player);
+        await playerFeatures.caption(player);
+        if (config.quality) {
+          await playerFeatures.setQuality(player, config.quality);
+        }
+        console.log("All player features applied");
+      } catch (err) {
+        console.warn("Failed to apply all features:", err);
+      }
+    },
+
     loop: async (player: YouTubePlayer) => {
       try {
         if (config.autoLoop) player.setLoopVideo(true);
@@ -709,6 +744,29 @@ export const watchFeature = (() => {
   };
 
   const eventHandlers = {
+    refresh: async () => {
+      try {
+        console.log("Refreshing player features...");
+
+        if (!state.player) {
+          state.player = await waitForPlayer();
+        }
+
+        if (state.player) {
+          await playerFeatures.applyAll(state.player);
+
+          if (!state.isLiveNow) {
+            cleanup.timeTracking?.();
+            cleanup.timeTracking = timeTracking.setup(state.player);
+          }
+        }
+
+        console.log("Player features refreshed successfully");
+      } catch (err) {
+        console.warn("Failed to refresh player features:", err);
+      }
+    },
+
     setting: (event: Event) => {
       try {
         const { setting, value } = (event as CustomEvent).detail;
@@ -756,10 +814,7 @@ export const watchFeature = (() => {
       state.player = await waitForPlayer();
       if (!state.player) return;
 
-      await playerFeatures.loop(state.player);
-      await playerFeatures.caption(state.player);
-      if (config.quality)
-        await playerFeatures.setQuality(state.player, config.quality);
+      await playerFeatures.applyAll(state.player);
     } catch (err) {
       console.warn("Failed to handle video:", err);
     }
@@ -789,6 +844,7 @@ export const watchFeature = (() => {
 
       window.addEventListener("yt-enhancer-setting", eventHandlers.setting);
       window.addEventListener("yt-enhancer-quality", eventHandlers.quality);
+      window.addEventListener("yt-enhancer-refresh", eventHandlers.refresh);
 
       const handleBeforeUnload = () => timeTracking.save();
       const handleVisibilityChange = () =>
@@ -809,6 +865,10 @@ export const watchFeature = (() => {
         window.removeEventListener(
           "yt-enhancer-quality",
           eventHandlers.quality,
+        );
+        window.removeEventListener(
+          "yt-enhancer-refresh",
+          eventHandlers.refresh,
         );
         document.removeEventListener(
           "visibilitychange",
