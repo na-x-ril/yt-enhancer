@@ -36,7 +36,7 @@ type Config = {
   autoLoop: boolean;
   autoCaption: boolean;
   qualityService: boolean;
-  quality: string | null;
+  quality: string | "hd1080";
   isCaptionActive: boolean;
 };
 
@@ -688,9 +688,7 @@ export const watchFeature = (() => {
       try {
         await playerFeatures.loop(player);
         await playerFeatures.caption(player);
-        if (config.quality) {
-          await playerFeatures.setQuality(player, config.quality);
-        }
+        await playerFeatures.setQuality(player, config.quality);
         console.log("All player features applied");
       } catch (err) {
         console.warn("Failed to apply all features:", err);
