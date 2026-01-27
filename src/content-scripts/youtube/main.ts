@@ -36,7 +36,6 @@ const observer = new MutationObserver(() => {
     syncFeatures(FEATURES);
   }
 
-  // Re-inject dropdown jika hilang
   if (!document.querySelector("#yt-enhancer-dropdown")) {
     dropdown?.inject();
   }

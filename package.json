@@ -4,19 +4,27 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "bun scripts/build.ts",
+    "dev": "rollup -c -w",
+    "build": "rollup -c",
+    "clean": "rm -rf dist",
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/bun": "latest",
+    "@types/minimatch": "^6.0.0",
+    "@types/webextension-polyfill": "^0.12.4",
     "esbuild": "^0.27.2",
-    "sass": "^1.97.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "rollup": "^4.57.0",
+    "rollup-plugin-copy": "^3.5.0",
+    "rollup-plugin-esbuild": "^6.2.1",
+    "rollup-plugin-scss": "^4.0.1",
+    "sass": "^1.97.3",
+    "tslib": "^2.8.1"
   },
   "dependencies": {
-    "@types/webextension-polyfill": "^0.12.4",
     "countup.js": "^2.9.0",
     "odometer_countup": "^1.0.4",
     "webextension-polyfill": "^0.12.0"
