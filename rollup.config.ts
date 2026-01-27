@@ -36,6 +36,22 @@ export default defineConfig([
     plugins: basePlugins,
   },
   {
+    input: "src/content-scripts/youtube/style.scss",
+    output: {
+      file: "dist/youtube/style.css",
+      assetFileNames: "youtube/style.css",
+    },
+    onwarn(warning, warn) {
+      if (warning.code === "EMPTY_BUNDLE") return;
+      warn(warning);
+    },
+    plugins: [
+      scss({
+        output: false,
+      }),
+    ],
+  },
+  {
     input: "src/content-scripts/youtube/main.ts",
     output: {
       file: "dist/youtube/index.js",
@@ -47,9 +63,6 @@ export default defineConfig([
     },
     plugins: [
       ...basePlugins,
-      scss({
-        output: "dist/youtube/style.css",
-      }),
       copy({
         targets: [
           { src: "public/**/*", dest: "dist" },
