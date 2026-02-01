@@ -2,6 +2,7 @@
 import { FEATURES } from "./features";
 import { syncFeatures } from "./controller";
 import { Dropdown } from "./components/dropdown";
+import { getVideoId } from "./utils";
 
 let dropdown: Dropdown | null = null;
 
@@ -24,11 +25,11 @@ syncFeatures(FEATURES);
 initDropdown();
 
 let lastPath = location.pathname;
-let lastVideoId = new URLSearchParams(location.search).get("v");
+let lastVideoId = getVideoId();
 
 const observer = new MutationObserver(() => {
   const currentPath = location.pathname;
-  const currentVideoId = new URLSearchParams(location.search).get("v");
+  const currentVideoId = getVideoId();
 
   if (currentPath !== lastPath || currentVideoId !== lastVideoId) {
     lastPath = currentPath;

@@ -1,5 +1,4 @@
 // src/content-scripts/youtube/controller/index.ts
-
 import type { Feature } from "../types/feature";
 
 let activeFeature: { destroy?: () => void; feature: Feature } | null = null;
