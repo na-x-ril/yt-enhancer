@@ -5,6 +5,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import scss from "rollup-plugin-scss";
 import copy from "rollup-plugin-copy";
 import { defineConfig } from "rollup";
+import fs from "fs";
 
 const basePlugins = [
   resolve({ browser: true }),
@@ -17,6 +18,16 @@ const basePlugins = [
     tsconfig: "./tsconfig.json",
   }),
 ];
+
+const cleanupPlugin = () => ({
+  name: "cleanup",
+  writeBundle: () => {
+    const dummyPath = "dist/youtube/dummy.js";
+    if (fs.existsSync(dummyPath)) {
+      fs.unlinkSync(dummyPath);
+    }
+  },
+});
 
 export default defineConfig([
   {
@@ -38,8 +49,7 @@ export default defineConfig([
   {
     input: "src/content-scripts/youtube/style.scss",
     output: {
-      file: "dist/youtube/style.css",
-      assetFileNames: "youtube/style.css",
+      file: "dist/youtube/dummy.js",
     },
     onwarn(warning, warn) {
       if (warning.code === "EMPTY_BUNDLE") return;
@@ -47,8 +57,10 @@ export default defineConfig([
     },
     plugins: [
       scss({
-        output: false,
+        fileName: "style.css",
+        outputStyle: "compressed",
       }),
+      cleanupPlugin(),
     ],
   },
   {
@@ -65,8 +77,8 @@ export default defineConfig([
       ...basePlugins,
       copy({
         targets: [
-          { src: "public/**/*", dest: "dist" },
-          { src: "manifest.json", dest: "dist" },
+          { src: "src/public/", dest: "dist" },
+          { src: "src/manifest.json", dest: "dist" },
         ],
       }),
     ],
