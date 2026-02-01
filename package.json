@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "rollup -c -w",
-    "build": "rollup -c",
-    "clean": "rm -rf dist",
+    "build": "bun scripts/build.ts",
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
