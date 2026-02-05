@@ -126,9 +126,8 @@ const viewCountParser = {
     };
   },
   extractSuffix: (viewCountString: string) => {
-    if (!viewCountString) {
+    if (!viewCountString)
       return { number: 0, suffix: "", divisor: 1, decimalPlaces: 0 };
-    }
 
     const lowerStr = viewCountString.toLowerCase();
     let divisor = 1;
@@ -252,14 +251,9 @@ const animation = {
         smartEasingAmount: 333,
         separator: ",",
         decimal: ".",
-        plugin: new Odometer({
-          duration: duration * 0.4,
-          lastDigitDelay: 0.1,
-        }),
+        plugin: new Odometer({ duration: duration * 0.4, lastDigitDelay: 0.1 }),
         onCompleteCallback: () => {
-          if (!state.isDestroyed) {
-            state.currentViewCount = toValue;
-          }
+          if (!state.isDestroyed) state.currentViewCount = toValue;
           cleanup.countUp = null;
         },
       });
@@ -329,9 +323,8 @@ const networkIntercept = (() => {
           if (url?.includes("/youtubei/v1/updated_metadata")) {
             try {
               const data: YouTubeUpdateResponse = await response.clone().json();
-              if (data.actions && !state.isDestroyed) {
+              if (data.actions && !state.isDestroyed)
                 networkIntercept.handleUpdate(data.actions);
-              }
             } catch {}
           }
 
@@ -397,6 +390,7 @@ const ui = {
 
       if (isUpdate && existingInfo && viewCountElement) {
         if (newViewCount !== state.currentViewCount) {
+          console.log("View count update:", viewCount);
           animation.animate(
             viewCountElement,
             state.currentViewCount,
@@ -408,6 +402,7 @@ const ui = {
           "yt-enhancer-date-text",
         );
         if (dateTextElement && dateText !== state.currentDateText) {
+          console.log("Date text update:", dateText);
           dateTextElement.textContent = dateText;
           state.currentDateText = dateText;
         }
@@ -467,10 +462,10 @@ const ui = {
     const button = document.createElement("button");
     button.id = "yt-enhancer-refresh-btn";
     button.innerHTML = `
-        <svg height="28" viewBox="0 0 24 24" width="28" focusable="false">
-          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"></path>
-        </svg>
-      `;
+      <svg height="28" viewBox="0 0 24 24" width="28" focusable="false">
+        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"></path>
+      </svg>
+    `;
 
     button.onclick = async () => {
       if (state.isDestroyed) return;
@@ -581,9 +576,7 @@ const videoData = {
       data.contents.twoColumnWatchNextResults.results.results.contents;
     const videoPrimaryInfo = videoData.findVideoPrimaryInfo(contents);
 
-    if (!videoPrimaryInfo?.videoPrimaryInfoRenderer) {
-      return null;
-    }
+    if (!videoPrimaryInfo?.videoPrimaryInfoRenderer) return null;
 
     const content =
       videoPrimaryInfo.videoPrimaryInfoRenderer?.viewCount
@@ -610,9 +603,7 @@ const videoData = {
       ytInitialData.contents.twoColumnWatchNextResults.results.results.contents;
     const videoPrimaryInfo = videoData.findVideoPrimaryInfo(contents);
 
-    if (!videoPrimaryInfo?.videoPrimaryInfoRenderer) {
-      return null;
-    }
+    if (!videoPrimaryInfo?.videoPrimaryInfoRenderer) return null;
 
     const content = videoPrimaryInfo.videoPrimaryInfoRenderer;
     return state.state === 3
@@ -627,7 +618,6 @@ const videoData = {
     if (state.isDestroyed) return;
     try {
       const data = await videoData.fetch(location.href);
-
       if (state.isDestroyed) return;
 
       if (data.ytInitialData && data.ytInitialPlayerResponse) {
@@ -647,20 +637,25 @@ const videoData = {
           ytInitialPlayerResponseObj,
         );
 
+        console.log(
+          "Video Title:",
+          ytInitialPlayerResponseObj.videoDetails.title,
+        );
+        console.log("View Count:", viewCount);
+        console.log("Date Text:", dateText);
+
         if (state.isDestroyed) return;
 
-        if (viewCount && dateText) {
+        if (viewCount && dateText)
           await ui.displayVideoInfo(viewCount, dateText, isUpdate);
-        }
 
         if (state.isLiveNow) {
           const isDVREnabled = videoData.getDVREnabled(
             ytInitialPlayerResponseObj,
           );
+          console.log("Is Live DVR Enabled:", isDVREnabled);
           await waitForElement("div.ytp-time-wrapper", 5000);
-          if (!state.isDestroyed) {
-            ui.displayDVRIndicator(isDVREnabled);
-          }
+          if (!state.isDestroyed) ui.displayDVRIndicator(isDVREnabled);
         }
 
         if (
@@ -695,8 +690,7 @@ const playerFeatures = {
   setQuality: async (player: YouTubePlayer, quality: string) => {
     if (state.isDestroyed) return;
     try {
-      if (!config.qualityService) return;
-      await player.setPlaybackQualityRange(quality);
+      if (config.qualityService) await player.setPlaybackQualityRange(quality);
     } catch {}
   },
   caption: (player: YouTubePlayer) => {
@@ -734,9 +728,8 @@ const eventHandlers = {
         return;
       }
 
-      if (!state.player) {
-        state.player = await waitForPlayer();
-      }
+      if (!state.player) state.player = await waitForPlayer();
+
       if (state.player && !state.isDestroyed) {
         await playerFeatures.applyAll(state.player);
         if (!state.isLiveNow) {
@@ -757,9 +750,8 @@ const eventHandlers = {
         state.player.setLoopVideo(value);
       } else if (setting === "qualityService") {
         config.qualityService = value;
-        if (value && config.quality) {
+        if (value && config.quality)
           playerFeatures.setQuality(state.player, config.quality);
-        }
       } else if (setting === "autoCaption") {
         config.autoCaption = value;
         if (value && !state.isCaptionActive) {
@@ -777,9 +769,8 @@ const eventHandlers = {
     try {
       const { quality: newQuality } = (event as CustomEvent).detail;
       config.quality = newQuality;
-      if (state.player && config.qualityService) {
+      if (state.player && config.qualityService)
         playerFeatures.setQuality(state.player, newQuality);
-      }
     } catch {}
   },
 };
@@ -787,12 +778,9 @@ const eventHandlers = {
 const handleVideo = async () => {
   if (state.isDestroyed) return;
   try {
-    if (!state.player) {
-      state.player = await waitForPlayer();
-    }
-    if (state.player && !state.isDestroyed) {
+    if (!state.player) state.player = await waitForPlayer();
+    if (state.player && !state.isDestroyed)
       await playerFeatures.applyAll(state.player);
-    }
   } catch {}
 };
 
@@ -805,22 +793,13 @@ export const watchFeature = {
     if (previousId && previousId !== currentId) {
       console.log(`[YT Enhancer] Video changed: ${previousId} → ${currentId}`);
       runCleanup();
-    } else if (previousId === currentId) {
-      console.log(
-        `[YT Enhancer] Warning: Same video init called: ${currentId}`,
-      );
-    } else {
-      console.log(`[YT Enhancer] New video loaded: ${currentId}`);
     }
 
-    if (state.isDestroyed) {
-      resetState();
-    }
+    if (state.isDestroyed) resetState();
 
     state.id = currentId;
     await configManager.load();
     networkIntercept.setup();
-
     await videoData.fetchAndLog();
 
     const handleBeforeUnload = () => timeTracking.save();
@@ -858,10 +837,7 @@ export const watchFeature = {
 
     await handleVideo();
 
-    return () => {
-      console.log(`[YT Enhancer] Cleaning up for video: ${state.id}`);
-      runCleanup();
-    };
+    return () => runCleanup();
   },
   fetchVideoData: videoData.fetch,
 };
