@@ -1,7 +1,7 @@
-// scripts/build.ts
 import { $ } from "bun";
-import { rmSync, existsSync, statSync } from "fs";
+import { rmSync, existsSync, statSync, readdirSync, readFileSync } from "fs";
 import path from "path";
+import JSZip from "jszip";
 
 const distPath = path.resolve("dist");
 const zipPath = path.resolve("yt-enhancer.zip");
@@ -9,12 +9,31 @@ const zipPath = path.resolve("yt-enhancer.zip");
 const formatSize = (bytes: number) => {
   const kb = bytes / 1024;
   const mb = kb / 1024;
-
   return {
     bytes,
     kb: kb.toFixed(2),
     mb: mb.toFixed(2),
   };
+};
+
+const addFolderToZip = (zip: JSZip, folderPath: string) => {
+  const files = readdirSync(folderPath, { withFileTypes: true });
+
+  for (const file of files) {
+    const fullPath = path.join(folderPath, file.name);
+
+    if (file.isDirectory()) {
+      const childZip = zip.folder(file.name);
+
+      if (!childZip) {
+        throw new Error(`Failed to create zip folder: ${file.name}`);
+      }
+
+      addFolderToZip(childZip, fullPath);
+    } else {
+      zip.file(file.name, readFileSync(fullPath));
+    }
+  }
 };
 
 async function build() {
@@ -30,8 +49,20 @@ async function build() {
     console.log("📦 Building...");
     await $`rollup -c`;
 
-    console.log("🗜️  Creating zip...");
-    await $`cd dist && zip -r ../yt-enhancer.zip .`;
+    console.log("🗜️  Creating zip with JSZip...");
+
+    const zip = new JSZip();
+    addFolderToZip(zip, distPath);
+
+    const content = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+      compressionOptions: {
+        level: 9,
+      },
+    });
+
+    await Bun.write(zipPath, content);
 
     if (existsSync(zipPath)) {
       const { size } = statSync(zipPath);
