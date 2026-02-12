@@ -33,7 +33,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
-data*.json
 yt-enhancer.zip
-commit.md
-diff.txt
+dev/*
+!dev/generate-icons.ts
